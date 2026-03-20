@@ -215,6 +215,36 @@ body::before {
 .thinking-bubble:hover { border-color: rgba(91,156,246,0.35) !important; }
 .thinking-preview { color: var(--info); font-family: 'IBM Plex Mono', monospace; font-size: 11px; line-height: 1.5; }
 .thinking-content { color: var(--text2); font-size: 12px; line-height: 1.7; margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(91,156,246,0.15); white-space: pre-wrap; max-height: 380px; overflow-y: auto; }
+
+/* ── SETTINGS DRAWER ── */
+.settings-btn { display: flex; align-items: center; gap: 5px; padding: 5px 11px; background: var(--surface2); border: 1px solid var(--border2); border-radius: 8px; color: var(--text2); font-family: 'IBM Plex Mono', monospace; font-size: 11px; cursor: pointer; transition: all 0.2s; margin-left: auto; }
+.settings-btn:hover, .settings-btn.open { border-color: var(--amber); color: var(--amber); }
+.settings-backdrop { display: none; position: fixed; inset: 0; z-index: 998; }
+.settings-backdrop.open { display: block; }
+.settings-panel { position: fixed; top: 49px; right: 0; width: 300px; height: calc(100% - 49px); background: var(--surface); border-left: 1px solid var(--border); z-index: 999; transform: translateX(100%); transition: transform 0.22s ease; overflow-y: auto; display: flex; flex-direction: column; gap: 0; }
+.settings-panel.open { transform: translateX(0); }
+.settings-panel-header { padding: 14px 16px 10px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+.settings-panel-header span { font-size: 11px; font-family: 'IBM Plex Mono', monospace; color: var(--text2); text-transform: uppercase; letter-spacing: 0.08em; }
+.settings-panel-header button { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 14px; padding: 2px 4px; }
+.settings-panel-header button:hover { color: var(--text); }
+.settings-section { padding: 14px 16px; border-bottom: 1px solid var(--border); display: flex; flex-direction: column; gap: 8px; }
+.settings-section-label { font-size: 10px; font-family: 'IBM Plex Mono', monospace; color: var(--muted); text-transform: uppercase; letter-spacing: 0.1em; }
+.settings-section-note { font-size: 10px; color: var(--muted); font-family: 'IBM Plex Mono', monospace; }
+.preset-row { display: flex; gap: 6px; }
+.preset-btn { flex: 1; padding: 5px 0; background: var(--surface2); border: 1px solid var(--border2); border-radius: 7px; color: var(--text2); font-family: 'IBM Plex Mono', monospace; font-size: 11px; cursor: pointer; transition: all 0.15s; }
+.preset-btn:hover { border-color: var(--amber); color: var(--text); }
+.preset-btn.active { border-color: var(--amber); color: var(--amber); background: var(--amber-dim); }
+.slider-row { display: flex; align-items: center; gap: 10px; }
+.slider-row input[type=range] { flex: 1; accent-color: var(--amber); height: 3px; cursor: pointer; }
+.slider-row .slider-val { font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--amber); min-width: 30px; text-align: right; }
+.settings-section.locked { opacity: 0.45; pointer-events: none; }
+.system-prompt-textarea { width: 100%; background: var(--surface2); border: 1px solid var(--border2); border-radius: 8px; color: var(--text); font-family: 'IBM Plex Mono', monospace; font-size: 11px; padding: 10px; resize: vertical; outline: none; line-height: 1.6; min-height: 180px; transition: border-color 0.2s; }
+.system-prompt-textarea:focus { border-color: var(--amber); }
+.system-prompt-actions { display: flex; gap: 6px; }
+.sp-btn { flex: 1; padding: 6px; border-radius: 7px; font-family: 'IBM Plex Mono', monospace; font-size: 11px; cursor: pointer; transition: all 0.15s; border: 1px solid var(--border2); background: var(--surface2); color: var(--text2); }
+.sp-btn:hover { border-color: var(--amber); color: var(--amber); }
+.sp-btn.primary { background: var(--amber); color: var(--bg); border-color: var(--amber); font-weight: 600; }
+.sp-btn.primary:hover { background: var(--amber-soft); }
 .loading-spinner { width: 36px; height: 36px; border-radius: 50%; border: 3px solid var(--border2); border-top-color: var(--amber); animation: spin 0.8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 .loading-text { font-size: 12px; color: var(--text2); font-family: 'IBM Plex Mono', monospace; }
@@ -297,6 +327,53 @@ body::before {
       <span class="cost-label">session</span>
       <span class="cost-value" id="cost-value">$0.0000</span>
       <span class="cost-tokens" id="cost-tokens">0tok</span>
+    </div>
+    <button class="settings-btn" id="settings-btn" onclick="toggleSettings()">⚙ settings</button>
+  </div>
+
+  <!-- SETTINGS DRAWER -->
+  <div class="settings-backdrop" id="settings-backdrop" onclick="toggleSettings()"></div>
+  <div class="settings-panel" id="settings-panel">
+    <div class="settings-panel-header">
+      <span>AI Settings</span>
+      <button onclick="toggleSettings()">✕</button>
+    </div>
+
+    <div class="settings-section" id="temp-section">
+      <div class="settings-section-label">Temperature</div>
+      <div class="preset-row">
+        <button class="preset-btn" onclick="setTempPreset(0.2, this)">Precise</button>
+        <button class="preset-btn active" id="temp-preset-balanced" onclick="setTempPreset(0.6, this)">Balanced</button>
+        <button class="preset-btn" onclick="setTempPreset(0.9, this)">Creative</button>
+      </div>
+      <div class="slider-row">
+        <input type="range" id="temp-slider" min="0" max="1" step="0.05" value="0.6" oninput="onTempSlider(this.value)">
+        <span class="slider-val" id="temp-val">0.60</span>
+      </div>
+      <div class="settings-section-note" id="temp-note">Lower = precise & formal · Higher = creative & varied</div>
+    </div>
+
+    <div class="settings-section">
+      <div class="settings-section-label">Response Length</div>
+      <div class="preset-row">
+        <button class="preset-btn" onclick="setMaxTokens(1024, this)">Short</button>
+        <button class="preset-btn active" onclick="setMaxTokens(4096, this)">Normal</button>
+        <button class="preset-btn" onclick="setMaxTokens(16384, this)">Long</button>
+      </div>
+      <div class="settings-section-note">Short ~750w · Normal ~3000w · Long ~12000w</div>
+    </div>
+
+    <div class="settings-section" style="flex:1">
+      <div class="settings-section-label" style="display:flex;align-items:center;justify-content:space-between">
+        System Prompt
+        <button class="sp-btn" style="flex:none;padding:3px 8px" onclick="resetSystemPrompt()">reset</button>
+      </div>
+      <textarea class="system-prompt-textarea" id="system-prompt-editor" rows="14" spellcheck="false"></textarea>
+      <div class="system-prompt-actions">
+        <button class="sp-btn" onclick="toggleSettings()">Cancel</button>
+        <button class="sp-btn primary" onclick="saveSystemPrompt()">Save & Apply</button>
+      </div>
+      <div class="settings-section-note" id="sp-status"></div>
     </div>
   </div>
 
@@ -400,6 +477,9 @@ const MODEL_CAPS = {
   supportsThinking:  id => /claude-(3-7-sonnet|sonnet-4|opus-4|opus-5|sonnet-5)/.test(id)
 };
 let thinkingEnabled = false;
+let temperature = 0.6;
+let maxTokens = 4096;
+let customSystem = null;
 
 // Pricing per million tokens (input / output) — USD
 const MODEL_PRICING = [
@@ -1202,11 +1282,13 @@ async function callClaude(messages, onTextChunk, onThinkingChunk) {
   };
   if (useThinking) headers['anthropic-beta'] = 'interleaved-thinking-2025-05-14';
 
+  const systemText = customSystem || SYSTEM;
   const body = {
     model: selectedModel,
-    max_tokens: useThinking ? 16000 : 4096,
+    max_tokens: useThinking ? Math.max(maxTokens, 16000) : maxTokens,
+    temperature: useThinking ? 1 : temperature,
     // Prompt caching: mark system prompt as cacheable — billed at ~10% after first request
-    system: [{ type: 'text', text: SYSTEM, cache_control: { type: 'ephemeral' } }],
+    system: [{ type: 'text', text: systemText, cache_control: { type: 'ephemeral' } }],
     tools,
     messages,
     stream: true
@@ -1295,6 +1377,14 @@ function toggleThinking() {
   const btn = document.getElementById('thinking-btn');
   btn.classList.toggle('active', thinkingEnabled);
   btn.title = thinkingEnabled ? 'Extended thinking ON — click to disable' : 'Extended thinking OFF — click to enable';
+  // Temperature is locked to 1.0 when thinking is on (API requirement)
+  const tempSection = document.getElementById('temp-section');
+  if (tempSection) {
+    tempSection.classList.toggle('locked', thinkingEnabled);
+    document.getElementById('temp-note').textContent = thinkingEnabled
+      ? '🔒 Locked to 1.0 — required when extended thinking is on'
+      : 'Lower = precise & formal · Higher = creative & varied';
+  }
 }
 
 function updateModelCapUI(modelId) {
@@ -1309,6 +1399,56 @@ function updateModelCapUI(modelId) {
   thBtn.classList.toggle('disabled-cap', !thCapable);
   if (!thCapable) { thinkingEnabled = false; thBtn.classList.remove('active'); }
   thBtn.title = thCapable ? (thinkingEnabled ? 'Extended thinking ON — click to disable' : 'Extended thinking OFF — click to enable') : 'Extended thinking not available for this model';
+}
+
+// ── SETTINGS PANEL ──
+function toggleSettings() {
+  const panel = document.getElementById('settings-panel');
+  const backdrop = document.getElementById('settings-backdrop');
+  const btn = document.getElementById('settings-btn');
+  const opening = !panel.classList.contains('open');
+  panel.classList.toggle('open', opening);
+  backdrop.classList.toggle('open', opening);
+  btn.classList.toggle('open', opening);
+  if (opening) {
+    document.getElementById('system-prompt-editor').value = customSystem || SYSTEM;
+    document.getElementById('sp-status').textContent = '';
+  }
+}
+
+function setTempPreset(val, btn) {
+  temperature = val;
+  document.getElementById('temp-slider').value = val;
+  document.getElementById('temp-val').textContent = val.toFixed(2);
+  document.querySelectorAll('#temp-section .preset-btn').forEach(b => b.classList.toggle('active', b === btn));
+}
+
+function onTempSlider(val) {
+  temperature = parseFloat(val);
+  document.getElementById('temp-val').textContent = temperature.toFixed(2);
+  const presets = { 0.2: 0, 0.6: 1, 0.9: 2 };
+  document.querySelectorAll('#temp-section .preset-btn').forEach((b, i) => b.classList.toggle('active', presets[temperature] === i));
+}
+
+function setMaxTokens(val, btn) {
+  maxTokens = val;
+  btn.closest('.preset-row').querySelectorAll('.preset-btn').forEach(b => b.classList.toggle('active', b === btn));
+}
+
+function resetSystemPrompt() {
+  customSystem = null;
+  document.getElementById('system-prompt-editor').value = SYSTEM;
+  document.getElementById('sp-status').textContent = 'Reset to default.';
+}
+
+function saveSystemPrompt() {
+  const val = document.getElementById('system-prompt-editor').value.trim();
+  customSystem = val || null;
+  const status = document.getElementById('sp-status');
+  status.textContent = customSystem ? '✓ Custom prompt saved. Takes effect on next message.' : '✓ Reset to default.';
+  conversationHistory = [];
+  sessionUsage = { inputTokens: 0, outputTokens: 0, cost: 0 };
+  updateCostDisplay();
 }
 
 function addThinkingBlock(text) {
