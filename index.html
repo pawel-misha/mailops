@@ -198,8 +198,19 @@ body::before {
   max-width: 220px;
 }
 .model-selector-wrap select:hover { border-color: var(--amber); }
-.model-selector-wrap select:focus { border-color: var(--amber); box-shadow: 0 0 0 2px var(--amber-dim); } background: var(--bg); display: none; align-items: center; justify-content: center; flex-direction: column; gap: 14px; }
+.model-selector-wrap select:focus { border-color: var(--amber); box-shadow: 0 0 0 2px var(--amber-dim); }
+.loading-overlay { background: var(--bg); display: none; align-items: center; justify-content: center; flex-direction: column; gap: 14px; }
 .loading-overlay.show { display: flex; }
+
+.web-search-btn { display: flex; align-items: center; gap: 5px; padding: 5px 10px; background: var(--surface2); border: 1px solid var(--border2); border-radius: 8px; color: var(--text2); font-family: 'IBM Plex Mono', monospace; font-size: 11px; cursor: pointer; transition: all 0.2s; white-space: nowrap; }
+.web-search-btn:hover { border-color: var(--amber); color: var(--text); }
+.web-search-btn.active { border-color: var(--info); color: var(--info); background: var(--info-dim); }
+.web-search-btn .ws-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
+.web-search-btn.disabled-cap { opacity: 0.35; cursor: not-allowed; pointer-events: none; }
+.cost-chip { display: flex; align-items: center; gap: 5px; padding: 5px 10px; background: var(--surface2); border: 1px solid var(--border2); border-radius: 8px; font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--text2); white-space: nowrap; cursor: default; user-select: none; }
+.cost-chip .cost-label { color: var(--muted); }
+.cost-chip .cost-value { color: var(--success); font-weight: 600; }
+.cost-chip .cost-tokens { color: var(--text2); font-size: 10px; }
 .loading-spinner { width: 36px; height: 36px; border-radius: 50%; border: 3px solid var(--border2); border-top-color: var(--amber); animation: spin 0.8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 .loading-text { font-size: 12px; color: var(--text2); font-family: 'IBM Plex Mono', monospace; }
@@ -271,6 +282,14 @@ body::before {
       <select id="model-select" onchange="onModelChange(this.value)">
         <option value="claude-sonnet-4-20250514">Loading models…</option>
       </select>
+    </div>
+    <button class="web-search-btn disabled-cap" id="web-search-btn" onclick="toggleWebSearch()" title="Enable web search for this model">
+      <span class="ws-dot"></span> web search
+    </button>
+    <div class="cost-chip" title="Session token usage and estimated cost">
+      <span class="cost-label">session</span>
+      <span class="cost-value" id="cost-value">$0.0000</span>
+      <span class="cost-tokens" id="cost-tokens">0tok</span>
     </div>
   </div>
 
@@ -365,6 +384,29 @@ let conversationHistory = [];
 let isThinking = false;
 let userLabels = [];
 let selectedModel = 'claude-sonnet-4-20250514';
+let webSearchEnabled = false;
+let sessionUsage = { inputTokens: 0, outputTokens: 0, cost: 0 };
+
+// Model capabilities: web search supported on claude-3+ models
+const MODEL_CAPS = {
+  supportsWebSearch: id => /claude-(3|4|sonnet-4|opus-4|haiku-3|haiku-4)/.test(id)
+};
+
+// Pricing per million tokens (input / output) — USD
+const MODEL_PRICING = [
+  { match: /opus-4|opus-5/,   input: 15,   output: 75   },
+  { match: /sonnet-4|sonnet-5/,input: 3,    output: 15   },
+  { match: /sonnet-3-7/,       input: 3,    output: 15   },
+  { match: /sonnet-3-5/,       input: 3,    output: 15   },
+  { match: /haiku-4|haiku-3-5/,input: 0.80, output: 4    },
+  { match: /haiku/,            input: 0.25, output: 1.25 },
+  { match: /opus-3/,           input: 15,   output: 75   },
+];
+
+function getPricing(modelId) {
+  const rule = MODEL_PRICING.find(r => r.match.test(modelId));
+  return rule || { input: 3, output: 15 }; // default to sonnet pricing
+}
 
 async function fetchModels() {
   try {
@@ -412,9 +454,11 @@ async function fetchModels() {
 
 function onModelChange(val) {
   selectedModel = val;
-  // Clear history when switching models for clean context
   conversationHistory = [];
-  addMsg('assistant', `Model switched to **${val}**. Conversation history cleared for a fresh start.`);
+  sessionUsage = { inputTokens: 0, outputTokens: 0, cost: 0 };
+  updateCostDisplay();
+  updateModelCapUI(val);
+  addMsg('assistant', `Model switched to **${val}**. Session reset.`);
 }
 
 // ── SETUP ──
@@ -437,6 +481,7 @@ async function startAuth() {
     document.getElementById('setup-screen').style.display = 'none';
     document.getElementById('app').classList.add('visible');
     await fetchModels();
+    updateModelCapUI(selectedModel);
     hideLoading();
   } catch(e) { hideLoading(); showErr('Auth failed: ' + e.message); }
 }
@@ -482,9 +527,17 @@ function showLoading(m) { document.getElementById('loading-text').textContent=m|
 function hideLoading() { document.getElementById('loading').classList.remove('show'); }
 
 // ── GMAIL API ──
-async function gFetch(url, opts={}) {
+async function gFetch(url, opts={}, _retry=0) {
   const r = await fetch(url, { ...opts, headers: { 'Authorization': `Bearer ${gmailToken}`, 'Content-Type': 'application/json', ...(opts.headers||{}) } });
   if (r.status===401) throw new Error('Gmail session expired — please reconnect.');
+  if (r.status===429 || r.status===503) {
+    if (_retry < 4) {
+      const delay = Math.pow(2, _retry) * 800 + Math.random() * 400;
+      await new Promise(res => setTimeout(res, delay));
+      return gFetch(url, opts, _retry + 1);
+    }
+    throw new Error('Gmail API rate limit — too many requests. Please wait a moment.');
+  }
   if (!r.ok) { const e=await r.json().catch(()=>({})); throw new Error(e.error?.message||`HTTP ${r.status}`); }
   if (r.status===204) return {};
   return r.json();
@@ -1127,13 +1180,50 @@ BEHAVIOR:
 - User is Paweł, Technical PM in Gdańsk, Poland. His inbox: pawel.laban@gmail.com with ~1500+ unread, lots of promotional noise.`;
 
 async function callClaude(messages) {
+  const tools = webSearchEnabled && MODEL_CAPS.supportsWebSearch(selectedModel)
+    ? [...TOOLS, { type: 'web_search_20250305', name: 'web_search' }]
+    : TOOLS;
   const r = await fetch('https://api.anthropic.com/v1/messages', {
     method:'POST',
     headers: { 'Content-Type':'application/json', 'x-api-key':ANTHROPIC_KEY, 'anthropic-version':'2023-06-01', 'anthropic-dangerous-direct-browser-access':'true' },
-    body:JSON.stringify({ model: selectedModel, max_tokens:4096, system:SYSTEM, tools:TOOLS, messages })
+    body:JSON.stringify({ model: selectedModel, max_tokens:4096, system:SYSTEM, tools, messages })
   });
   if (!r.ok) { const e=await r.json().catch(()=>({})); throw new Error(e.error?.message||`API ${r.status}`); }
-  return r.json();
+  const data = await r.json();
+  if (data.usage) {
+    const pricing = getPricing(selectedModel);
+    const inTok = data.usage.input_tokens || 0;
+    const outTok = data.usage.output_tokens || 0;
+    sessionUsage.inputTokens += inTok;
+    sessionUsage.outputTokens += outTok;
+    sessionUsage.cost += (inTok / 1e6) * pricing.input + (outTok / 1e6) * pricing.output;
+    updateCostDisplay();
+  }
+  return data;
+}
+
+function updateCostDisplay() {
+  const total = sessionUsage.inputTokens + sessionUsage.outputTokens;
+  document.getElementById('cost-value').textContent = '$' + sessionUsage.cost.toFixed(4);
+  document.getElementById('cost-tokens').textContent = total >= 1000 ? (total/1000).toFixed(1)+'k tok' : total+'tok';
+}
+
+function toggleWebSearch() {
+  if (!MODEL_CAPS.supportsWebSearch(selectedModel)) return;
+  webSearchEnabled = !webSearchEnabled;
+  const btn = document.getElementById('web-search-btn');
+  btn.classList.toggle('active', webSearchEnabled);
+  btn.title = webSearchEnabled ? 'Web search ON — click to disable' : 'Web search OFF — click to enable';
+}
+
+function updateModelCapUI(modelId) {
+  const btn = document.getElementById('web-search-btn');
+  const capable = MODEL_CAPS.supportsWebSearch(modelId);
+  btn.classList.toggle('disabled-cap', !capable);
+  if (!capable) { webSearchEnabled = false; btn.classList.remove('active'); }
+  btn.title = capable
+    ? (webSearchEnabled ? 'Web search ON — click to disable' : 'Web search OFF — click to enable')
+    : 'Web search not available for this model';
 }
 
 // ── CHAT ──
