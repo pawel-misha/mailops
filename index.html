@@ -363,12 +363,19 @@ body::before {
       <div class="settings-section-note">Short ~750w · Normal ~3000w · Long ~12000w</div>
     </div>
 
+    <div class="settings-section">
+      <div class="settings-section-label">About Me <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted)">— injected into every request</span></div>
+      <textarea class="system-prompt-textarea" id="user-profile-editor" rows="5" spellcheck="false" placeholder="e.g. I'm Paweł, Technical PM in Gdańsk. I prefer concise, direct emails. My timezone is CET. I work mostly with engineers and product teams..."></textarea>
+      <button class="sp-btn primary" onclick="saveUserProfile()">Save Profile</button>
+      <div class="settings-section-note" id="profile-status"></div>
+    </div>
+
     <div class="settings-section" style="flex:1">
       <div class="settings-section-label" style="display:flex;align-items:center;justify-content:space-between">
-        System Prompt
+        System Prompt <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted);font-size:9px">advanced</span>
         <button class="sp-btn" style="flex:none;padding:3px 8px" onclick="resetSystemPrompt()">reset</button>
       </div>
-      <textarea class="system-prompt-textarea" id="system-prompt-editor" rows="14" spellcheck="false"></textarea>
+      <textarea class="system-prompt-textarea" id="system-prompt-editor" rows="10" spellcheck="false"></textarea>
       <div class="system-prompt-actions">
         <button class="sp-btn" onclick="toggleSettings()">Cancel</button>
         <button class="sp-btn primary" onclick="saveSystemPrompt()">Save & Apply</button>
@@ -461,6 +468,7 @@ body::before {
 <script>
 // ── STATE ──
 let ANTHROPIC_KEY = '';
+// loadState() is called at bottom of script after all functions are defined
 let GOOGLE_CLIENT_ID = '';
 let gmailToken = null;
 let userEmail = '';
@@ -480,6 +488,33 @@ let thinkingEnabled = false;
 let temperature = 0.6;
 let maxTokens = 4096;
 let customSystem = null;
+let userProfile = '';
+
+// ── LOCALSTORAGE ──
+const LS = 'mailops_v1';
+function saveState() {
+  localStorage.setItem(LS, JSON.stringify({
+    anthropicKey: ANTHROPIC_KEY,
+    googleClientId: GOOGLE_CLIENT_ID,
+    selectedModel, temperature, maxTokens,
+    customSystem, userProfile,
+    webSearchEnabled, thinkingEnabled
+  }));
+}
+function loadState() {
+  try {
+    const s = JSON.parse(localStorage.getItem(LS) || '{}');
+    if (s.anthropicKey)   { ANTHROPIC_KEY = s.anthropicKey;   document.getElementById('anthropic-key').value = s.anthropicKey; }
+    if (s.googleClientId) { GOOGLE_CLIENT_ID = s.googleClientId; document.getElementById('google-client-id').value = s.googleClientId; }
+    if (s.selectedModel)  selectedModel = s.selectedModel;
+    if (s.temperature != null) { temperature = s.temperature; document.getElementById('temp-slider').value = temperature; document.getElementById('temp-val').textContent = temperature.toFixed(2); }
+    if (s.maxTokens)      maxTokens = s.maxTokens;
+    if (s.customSystem)   customSystem = s.customSystem;
+    if (s.userProfile)    userProfile = s.userProfile;
+    if (s.webSearchEnabled) webSearchEnabled = s.webSearchEnabled;
+    if (s.thinkingEnabled)  thinkingEnabled  = s.thinkingEnabled;
+  } catch(e) { /* ignore corrupt state */ }
+}
 
 // Pricing per million tokens (input / output) — USD
 const MODEL_PRICING = [
@@ -571,6 +606,7 @@ async function startAuth() {
     document.getElementById('app').classList.add('visible');
     await fetchModels();
     updateModelCapUI(selectedModel);
+    saveState();
     hideLoading();
   } catch(e) { hideLoading(); showErr('Auth failed: ' + e.message); }
 }
@@ -616,9 +652,31 @@ function showLoading(m) { document.getElementById('loading-text').textContent=m|
 function hideLoading() { document.getElementById('loading').classList.remove('show'); }
 
 // ── GMAIL API ──
+function silentTokenRefresh() {
+  return new Promise((res, rej) => {
+    try {
+      const client = google.accounts.oauth2.initTokenClient({
+        client_id: GOOGLE_CLIENT_ID,
+        scope: ['https://www.googleapis.com/auth/gmail.modify','https://www.googleapis.com/auth/gmail.compose','https://www.googleapis.com/auth/gmail.send','https://www.googleapis.com/auth/gmail.labels','https://www.googleapis.com/auth/gmail.settings.basic'].join(' '),
+        prompt: '',
+        callback: r => r.error ? rej(new Error(r.error)) : res(r.access_token)
+      });
+      client.requestAccessToken({ prompt: '' });
+    } catch(e) { rej(e); }
+  });
+}
+
 async function gFetch(url, opts={}, _retry=0) {
   const r = await fetch(url, { ...opts, headers: { 'Authorization': `Bearer ${gmailToken}`, 'Content-Type': 'application/json', ...(opts.headers||{}) } });
-  if (r.status===401) throw new Error('Gmail session expired — please reconnect.');
+  if (r.status===401) {
+    if (_retry === 0) {
+      try {
+        gmailToken = await silentTokenRefresh();
+        return gFetch(url, opts, 1);
+      } catch { throw new Error('Gmail session expired — please reconnect.'); }
+    }
+    throw new Error('Gmail session expired — please reconnect.');
+  }
   if (r.status===429 || r.status===503) {
     if (_retry < 4) {
       const delay = Math.pow(2, _retry) * 800 + Math.random() * 400;
@@ -1236,6 +1294,12 @@ async function executeTool(name, input) {
 }
 
 // ── CLAUDE API ──
+function buildSystemPrompt() {
+  const base = customSystem || SYSTEM;
+  if (!userProfile.trim()) return base;
+  return base + `\n\n## About the User\n${userProfile.trim()}`;
+}
+
 const SYSTEM = `You are MailOps, a powerful AI email assistant with full access to the user's Gmail. You have ALL Gmail API capabilities.
 
 TOOLS AVAILABLE:
@@ -1282,7 +1346,7 @@ async function callClaude(messages, onTextChunk, onThinkingChunk) {
   };
   if (useThinking) headers['anthropic-beta'] = 'interleaved-thinking-2025-05-14';
 
-  const systemText = customSystem || SYSTEM;
+  const systemText = buildSystemPrompt();
   const body = {
     model: selectedModel,
     max_tokens: useThinking ? Math.max(maxTokens, 16000) : maxTokens,
@@ -1412,7 +1476,12 @@ function toggleSettings() {
   btn.classList.toggle('open', opening);
   if (opening) {
     document.getElementById('system-prompt-editor').value = customSystem || SYSTEM;
+    document.getElementById('user-profile-editor').value = userProfile;
     document.getElementById('sp-status').textContent = '';
+    document.getElementById('profile-status').textContent = '';
+    // Sync temperature slider to current value
+    document.getElementById('temp-slider').value = temperature;
+    document.getElementById('temp-val').textContent = temperature.toFixed(2);
   }
 }
 
@@ -1421,6 +1490,7 @@ function setTempPreset(val, btn) {
   document.getElementById('temp-slider').value = val;
   document.getElementById('temp-val').textContent = val.toFixed(2);
   document.querySelectorAll('#temp-section .preset-btn').forEach(b => b.classList.toggle('active', b === btn));
+  saveState();
 }
 
 function onTempSlider(val) {
@@ -1428,27 +1498,36 @@ function onTempSlider(val) {
   document.getElementById('temp-val').textContent = temperature.toFixed(2);
   const presets = { 0.2: 0, 0.6: 1, 0.9: 2 };
   document.querySelectorAll('#temp-section .preset-btn').forEach((b, i) => b.classList.toggle('active', presets[temperature] === i));
+  saveState();
 }
 
 function setMaxTokens(val, btn) {
   maxTokens = val;
   btn.closest('.preset-row').querySelectorAll('.preset-btn').forEach(b => b.classList.toggle('active', b === btn));
+  saveState();
+}
+
+function saveUserProfile() {
+  userProfile = document.getElementById('user-profile-editor').value.trim();
+  document.getElementById('profile-status').textContent = userProfile ? '✓ Profile saved — active on next message.' : '✓ Profile cleared.';
+  saveState();
 }
 
 function resetSystemPrompt() {
   customSystem = null;
   document.getElementById('system-prompt-editor').value = SYSTEM;
   document.getElementById('sp-status').textContent = 'Reset to default.';
+  saveState();
 }
 
 function saveSystemPrompt() {
   const val = document.getElementById('system-prompt-editor').value.trim();
   customSystem = val || null;
-  const status = document.getElementById('sp-status');
-  status.textContent = customSystem ? '✓ Custom prompt saved. Takes effect on next message.' : '✓ Reset to default.';
+  document.getElementById('sp-status').textContent = customSystem ? '✓ Custom prompt saved. Takes effect on next message.' : '✓ Reset to default.';
   conversationHistory = [];
   sessionUsage = { inputTokens: 0, outputTokens: 0, cost: 0 };
   updateCostDisplay();
+  saveState();
 }
 
 function addThinkingBlock(text) {
@@ -1633,6 +1712,9 @@ function updateToolResult(el, result, isErr) {
 function resetMessages() {
   document.getElementById('messages').innerHTML = `<div class="welcome-msg" id="welcome"><div class="big-icon">⌨</div><h2>Full control of your <span>inbox</span></h2><p>I can search, read, send, reply, forward, delete, archive, label, star, and organize your Gmail. Ask me anything in plain language.</p><div class="chips"><div class="chip" onclick="q('Summarize my 5 most recent unread emails')">📋 Summarize unread</div><div class="chip" onclick="q('Delete all emails from Netflix — search first and show me what you find before deleting')">🗑️ Delete Netflix</div><div class="chip" onclick="q('Find emails about invoices or payments in the last 30 days')">💰 Find invoices</div><div class="chip" onclick="q('Compose a test email to myself at pawel.laban@gmail.com with subject Test and body Hello from MailOps')">✉️ Send test email</div></div></div>`;
 }
+
+// ── INIT ── run after all functions defined
+loadState();
 </script>
 </body>
 </html>
