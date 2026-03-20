@@ -211,6 +211,10 @@ body::before {
 .cost-chip .cost-label { color: var(--muted); }
 .cost-chip .cost-value { color: var(--success); font-weight: 600; }
 .cost-chip .cost-tokens { color: var(--text2); font-size: 10px; }
+.thinking-bubble { background: rgba(91,156,246,0.04) !important; border: 1px solid rgba(91,156,246,0.18) !important; cursor: pointer; }
+.thinking-bubble:hover { border-color: rgba(91,156,246,0.35) !important; }
+.thinking-preview { color: var(--info); font-family: 'IBM Plex Mono', monospace; font-size: 11px; line-height: 1.5; }
+.thinking-content { color: var(--text2); font-size: 12px; line-height: 1.7; margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(91,156,246,0.15); white-space: pre-wrap; max-height: 380px; overflow-y: auto; }
 .loading-spinner { width: 36px; height: 36px; border-radius: 50%; border: 3px solid var(--border2); border-top-color: var(--amber); animation: spin 0.8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 .loading-text { font-size: 12px; color: var(--text2); font-family: 'IBM Plex Mono', monospace; }
@@ -285,6 +289,9 @@ body::before {
     </div>
     <button class="web-search-btn disabled-cap" id="web-search-btn" onclick="toggleWebSearch()" title="Enable web search for this model">
       <span class="ws-dot"></span> web search
+    </button>
+    <button class="web-search-btn disabled-cap" id="thinking-btn" onclick="toggleThinking()" title="Enable extended thinking">
+      <span class="ws-dot"></span> thinking
     </button>
     <div class="cost-chip" title="Session token usage and estimated cost">
       <span class="cost-label">session</span>
@@ -387,10 +394,12 @@ let selectedModel = 'claude-sonnet-4-20250514';
 let webSearchEnabled = false;
 let sessionUsage = { inputTokens: 0, outputTokens: 0, cost: 0 };
 
-// Model capabilities: web search supported on claude-3+ models
+// Model capabilities
 const MODEL_CAPS = {
-  supportsWebSearch: id => /claude-(3|4|sonnet-4|opus-4|haiku-3|haiku-4)/.test(id)
+  supportsWebSearch: id => /claude-(3|4|sonnet-4|opus-4|haiku-3|haiku-4)/.test(id),
+  supportsThinking:  id => /claude-(3-7-sonnet|sonnet-4|opus-4|opus-5|sonnet-5)/.test(id)
 };
+let thinkingEnabled = false;
 
 // Pricing per million tokens (input / output) — USD
 const MODEL_PRICING = [
@@ -1179,27 +1188,91 @@ BEHAVIOR:
 - Always confirm destructive bulk actions before executing
 - User is Paweł, Technical PM in Gdańsk, Poland. His inbox: pawel.laban@gmail.com with ~1500+ unread, lots of promotional noise.`;
 
-async function callClaude(messages) {
+async function callClaude(messages, onTextChunk, onThinkingChunk) {
   const tools = webSearchEnabled && MODEL_CAPS.supportsWebSearch(selectedModel)
     ? [...TOOLS, { type: 'web_search_20250305', name: 'web_search' }]
     : TOOLS;
-  const r = await fetch('https://api.anthropic.com/v1/messages', {
-    method:'POST',
-    headers: { 'Content-Type':'application/json', 'x-api-key':ANTHROPIC_KEY, 'anthropic-version':'2023-06-01', 'anthropic-dangerous-direct-browser-access':'true' },
-    body:JSON.stringify({ model: selectedModel, max_tokens:4096, system:SYSTEM, tools, messages })
-  });
-  if (!r.ok) { const e=await r.json().catch(()=>({})); throw new Error(e.error?.message||`API ${r.status}`); }
-  const data = await r.json();
-  if (data.usage) {
-    const pricing = getPricing(selectedModel);
-    const inTok = data.usage.input_tokens || 0;
-    const outTok = data.usage.output_tokens || 0;
-    sessionUsage.inputTokens += inTok;
-    sessionUsage.outputTokens += outTok;
-    sessionUsage.cost += (inTok / 1e6) * pricing.input + (outTok / 1e6) * pricing.output;
-    updateCostDisplay();
+  const useThinking = thinkingEnabled && MODEL_CAPS.supportsThinking(selectedModel);
+
+  const headers = {
+    'Content-Type': 'application/json',
+    'x-api-key': ANTHROPIC_KEY,
+    'anthropic-version': '2023-06-01',
+    'anthropic-dangerous-direct-browser-access': 'true'
+  };
+  if (useThinking) headers['anthropic-beta'] = 'interleaved-thinking-2025-05-14';
+
+  const body = {
+    model: selectedModel,
+    max_tokens: useThinking ? 16000 : 4096,
+    // Prompt caching: mark system prompt as cacheable — billed at ~10% after first request
+    system: [{ type: 'text', text: SYSTEM, cache_control: { type: 'ephemeral' } }],
+    tools,
+    messages,
+    stream: true
+  };
+  if (useThinking) body.thinking = { type: 'enabled', budget_tokens: 8000 };
+
+  const r = await fetch('https://api.anthropic.com/v1/messages', { method: 'POST', headers, body: JSON.stringify(body) });
+  if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error?.message || `API ${r.status}`); }
+
+  const reader = r.body.getReader();
+  const decoder = new TextDecoder();
+  let stop_reason = null, inputTokens = 0, outputTokens = 0;
+  const blocks = {};
+  let buf = '';
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buf += decoder.decode(value, { stream: true });
+    const lines = buf.split('\n');
+    buf = lines.pop();
+    for (const line of lines) {
+      if (!line.startsWith('data: ')) continue;
+      const raw = line.slice(6).trim();
+      if (!raw || raw === '[DONE]') continue;
+      try {
+        const evt = JSON.parse(raw);
+        if (evt.type === 'message_start') {
+          inputTokens = evt.message?.usage?.input_tokens || 0;
+        } else if (evt.type === 'content_block_start') {
+          const cb = evt.content_block;
+          blocks[evt.index] = { type: cb.type, id: cb.id, name: cb.name, accumulated: '' };
+        } else if (evt.type === 'content_block_delta') {
+          const b = blocks[evt.index]; if (!b) continue;
+          const d = evt.delta;
+          if (d.type === 'text_delta')       { b.accumulated += d.text;         onTextChunk     && onTextChunk(b.accumulated, evt.index); }
+          if (d.type === 'input_json_delta') { b.accumulated += d.partial_json; }
+          if (d.type === 'thinking_delta')   { b.accumulated += d.thinking;     onThinkingChunk && onThinkingChunk(b.accumulated, evt.index); }
+        } else if (evt.type === 'content_block_stop') {
+          const b = blocks[evt.index];
+          if (b?.type === 'tool_use') { try { b.input = JSON.parse(b.accumulated || '{}'); } catch { b.input = {}; } }
+        } else if (evt.type === 'message_delta') {
+          stop_reason  = evt.delta?.stop_reason;
+          outputTokens = evt.usage?.output_tokens || 0;
+        }
+      } catch { /* ignore malformed SSE chunks */ }
+    }
   }
-  return data;
+
+  // Accumulate real token counts from stream
+  const pricing = getPricing(selectedModel);
+  sessionUsage.inputTokens  += inputTokens;
+  sessionUsage.outputTokens += outputTokens;
+  sessionUsage.cost += (inputTokens / 1e6) * pricing.input + (outputTokens / 1e6) * pricing.output;
+  updateCostDisplay();
+
+  const content = Object.entries(blocks)
+    .sort(([a], [b]) => +a - +b)
+    .map(([, b]) => {
+      if (b.type === 'text')     return { type: 'text',     text: b.accumulated };
+      if (b.type === 'tool_use') return { type: 'tool_use', id: b.id, name: b.name, input: b.input || {} };
+      if (b.type === 'thinking') return { type: 'thinking', thinking: b.accumulated };
+      return null;
+    }).filter(Boolean);
+
+  return { stop_reason, content };
 }
 
 function updateCostDisplay() {
@@ -1216,14 +1289,55 @@ function toggleWebSearch() {
   btn.title = webSearchEnabled ? 'Web search ON — click to disable' : 'Web search OFF — click to enable';
 }
 
+function toggleThinking() {
+  if (!MODEL_CAPS.supportsThinking(selectedModel)) return;
+  thinkingEnabled = !thinkingEnabled;
+  const btn = document.getElementById('thinking-btn');
+  btn.classList.toggle('active', thinkingEnabled);
+  btn.title = thinkingEnabled ? 'Extended thinking ON — click to disable' : 'Extended thinking OFF — click to enable';
+}
+
 function updateModelCapUI(modelId) {
-  const btn = document.getElementById('web-search-btn');
-  const capable = MODEL_CAPS.supportsWebSearch(modelId);
-  btn.classList.toggle('disabled-cap', !capable);
-  if (!capable) { webSearchEnabled = false; btn.classList.remove('active'); }
-  btn.title = capable
-    ? (webSearchEnabled ? 'Web search ON — click to disable' : 'Web search OFF — click to enable')
-    : 'Web search not available for this model';
+  const wsBtn = document.getElementById('web-search-btn');
+  const wsCapable = MODEL_CAPS.supportsWebSearch(modelId);
+  wsBtn.classList.toggle('disabled-cap', !wsCapable);
+  if (!wsCapable) { webSearchEnabled = false; wsBtn.classList.remove('active'); }
+  wsBtn.title = wsCapable ? (webSearchEnabled ? 'Web search ON — click to disable' : 'Web search OFF — click to enable') : 'Web search not available for this model';
+
+  const thBtn = document.getElementById('thinking-btn');
+  const thCapable = MODEL_CAPS.supportsThinking(modelId);
+  thBtn.classList.toggle('disabled-cap', !thCapable);
+  if (!thCapable) { thinkingEnabled = false; thBtn.classList.remove('active'); }
+  thBtn.title = thCapable ? (thinkingEnabled ? 'Extended thinking ON — click to disable' : 'Extended thinking OFF — click to enable') : 'Extended thinking not available for this model';
+}
+
+function addThinkingBlock(text) {
+  const c = document.getElementById('messages');
+  const d = document.createElement('div');
+  d.className = 'msg assistant';
+  d.innerHTML = `<div class="msg-meta"><div class="msg-avatar">🧠</div><span>thinking</span></div><div class="msg-bubble thinking-bubble"><div class="thinking-preview">thinking…</div><div class="thinking-content" style="display:none"></div></div>`;
+  c.appendChild(d); c.scrollTop = c.scrollHeight;
+  return d;
+}
+
+function updateThinkingBlock(el, text) {
+  const words = text.trim().split(/\s+/).length;
+  el.querySelector('.thinking-preview').textContent = `thinking… ${words} words`;
+  el.querySelector('.thinking-content').textContent = text;
+  document.getElementById('messages').scrollTop = 99999;
+}
+
+function finalizeThinkingBlock(el) {
+  const content = el.querySelector('.thinking-content');
+  const preview = el.querySelector('.thinking-preview');
+  const words = content.textContent.trim().split(/\s+/).length;
+  preview.innerHTML = `🧠 <em>Extended thinking</em> · ${words} words <span style="opacity:0.5">(click to expand)</span>`;
+  el.querySelector('.thinking-bubble').onclick = () => {
+    const open = content.style.display !== 'none';
+    content.style.display = open ? 'none' : 'block';
+    const hint = el.querySelector('.thinking-bubble span');
+    if (hint) hint.textContent = open ? '(click to expand)' : '(click to collapse)';
+  };
 }
 
 // ── CHAT ──
@@ -1249,30 +1363,52 @@ async function sendMessage() {
 
 async function agentLoop(typingEl) {
   let messages = [...conversationHistory];
-  while(true) {
-    const res = await callClaude(messages);
-    if (res.stop_reason==='end_turn') {
-      typingEl.remove();
-      const t = res.content.find(c=>c.type==='text')?.text||'';
-      if(t) { addMsg('assistant', t); conversationHistory.push({ role:'assistant', content:res.content }); }
+  while (true) {
+    let liveTextEl = null, thinkingEl = null, firstText = true;
+
+    const onTextChunk = (text) => {
+      if (firstText) {
+        typingEl?.remove(); typingEl = null; firstText = false;
+        liveTextEl = addMsg('assistant', '');
+      }
+      if (liveTextEl) {
+        liveTextEl.querySelector('.msg-bubble').innerHTML = fmt(text);
+        document.getElementById('messages').scrollTop = 99999;
+      }
+    };
+
+    const onThinkingChunk = (text) => {
+      if (!thinkingEl) { typingEl?.remove(); typingEl = null; thinkingEl = addThinkingBlock(); }
+      updateThinkingBlock(thinkingEl, text);
+    };
+
+    const { stop_reason, content } = await callClaude(messages, onTextChunk, onThinkingChunk);
+
+    if (thinkingEl) finalizeThinkingBlock(thinkingEl);
+    typingEl?.remove(); typingEl = null;
+
+    if (stop_reason === 'end_turn' || !stop_reason) {
+      const t = content.find(c => c.type === 'text')?.text || '';
+      if (t && !liveTextEl) addMsg('assistant', t);
+      if (content.length) conversationHistory.push({ role: 'assistant', content });
       break;
     }
-    if (res.stop_reason==='tool_use') {
-      typingEl.remove();
-      const txt = res.content.find(c=>c.type==='text');
-      if (txt?.text) addMsg('assistant', txt.text);
-      const calls = res.content.filter(c=>c.type==='tool_use');
+
+    if (stop_reason === 'tool_use') {
+      const txt = content.find(c => c.type === 'text');
+      if (txt?.text && !liveTextEl) addMsg('assistant', txt.text);
+      const calls = content.filter(c => c.type === 'tool_use');
       const results = [];
       for (const tc of calls) {
         const toolEl = addToolCall(tc.name, tc.input);
         let result;
         try { result = await executeTool(tc.name, tc.input); updateToolResult(toolEl, result, false); }
-        catch(e) { result={error:e.message}; updateToolResult(toolEl, result, true); }
-        results.push({ type:'tool_result', tool_use_id:tc.id, content:JSON.stringify(result) });
+        catch(e) { result = { error: e.message }; updateToolResult(toolEl, result, true); }
+        results.push({ type: 'tool_result', tool_use_id: tc.id, content: JSON.stringify(result) });
       }
-      messages = [...messages, { role:'assistant', content:res.content }, { role:'user', content:results }];
-      conversationHistory.push({ role:'assistant', content:res.content });
-      conversationHistory.push({ role:'user', content:results });
+      messages = [...messages, { role: 'assistant', content }, { role: 'user', content: results }];
+      conversationHistory.push({ role: 'assistant', content });
+      conversationHistory.push({ role: 'user', content: results });
       typingEl = addTyping();
     }
   }
