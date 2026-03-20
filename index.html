@@ -366,7 +366,10 @@ body::before {
     <div class="settings-section">
       <div class="settings-section-label">About Me <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted)">— injected into every request</span></div>
       <textarea class="system-prompt-textarea" id="user-profile-editor" rows="5" spellcheck="false" placeholder="e.g. I'm Paweł, Technical PM in Gdańsk. I prefer concise, direct emails. My timezone is CET. I work mostly with engineers and product teams..."></textarea>
-      <button class="sp-btn primary" onclick="saveUserProfile()">Save Profile</button>
+      <div class="system-prompt-actions">
+        <button class="sp-btn" id="learn-style-btn" onclick="learnMyStyle()">✨ Learn from sent emails</button>
+        <button class="sp-btn primary" onclick="saveUserProfile()">Save Profile</button>
+      </div>
       <div class="settings-section-note" id="profile-status"></div>
     </div>
 
@@ -1528,6 +1531,110 @@ function saveSystemPrompt() {
   sessionUsage = { inputTokens: 0, outputTokens: 0, cost: 0 };
   updateCostDisplay();
   saveState();
+}
+
+async function learnMyStyle() {
+  const btn = document.getElementById('learn-style-btn');
+  const status = document.getElementById('profile-status');
+  btn.disabled = true;
+  btn.textContent = '⏳ Fetching sent emails…';
+  status.textContent = '';
+
+  try {
+    // Step 1: fetch 100 most recent sent emails (snippets + metadata)
+    status.textContent = 'Fetching 100 sent emails…';
+    const searchResult = await executeTool('search_emails', {
+      query: 'in:sent -from:noreply -from:no-reply -subject:"Automatic reply" -subject:"Out of office"',
+      maxResults: 100
+    });
+    const emails = searchResult.messages || [];
+    if (emails.length < 5) throw new Error('Not enough sent emails found (need at least 5).');
+
+    // Step 2: read full body of 30 evenly-spaced emails
+    btn.textContent = '⏳ Reading email bodies…';
+    status.textContent = `Reading full body of 30 emails (from ${emails.length} found)…`;
+    const step = Math.max(1, Math.floor(emails.length / 30));
+    const toRead = emails.filter((_, i) => i % step === 0).slice(0, 30);
+
+    const bodies = [];
+    for (const email of toRead) {
+      try {
+        const full = await executeTool('read_email', { messageId: email.messageId });
+        if (full.body?.text || full.body?.html) {
+          const text = (full.body.text || full.body.html.replace(/<[^>]+>/g, ' ')).trim().slice(0, 800);
+          bodies.push({ subject: email.subject, to: email.to, body: text });
+        }
+      } catch { /* skip unreadable emails */ }
+    }
+
+    // Step 3: build analysis payload — snippets for all 100, full body for 30
+    btn.textContent = '⏳ Analysing writing style…';
+    status.textContent = 'Sending to Claude for analysis…';
+
+    const snippetBlock = emails.map((e, i) =>
+      `[${i+1}] To: ${e.to||'?'} | Subject: ${e.subject||'(no subject)'}\nSnippet: ${e.snippet||''}`
+    ).join('\n\n');
+
+    const bodyBlock = bodies.map((b, i) =>
+      `[FULL ${i+1}] To: ${b.to||'?'} | Subject: ${b.subject||''}\n${b.body}`
+    ).join('\n\n---\n\n');
+
+    const analysisPrompt = `Analyse the following sent emails from the user and produce a concise writing-style profile.
+
+SNIPPETS FROM 100 SENT EMAILS:
+${snippetBlock}
+
+FULL BODY OF 30 EMAILS:
+${bodyBlock}
+
+Based on these, write a style profile in 2nd person ("You write…", "You tend to…") covering:
+- Overall tone (formal/casual/direct/warm etc.)
+- Typical greeting and sign-off patterns
+- Sentence length and structure
+- Use of punctuation, emphasis, bullet points
+- Vocabulary and phrasing preferences
+- Typical email length
+- Any distinctive habits or patterns
+
+Keep it under 200 words. This will be used to instruct an AI to write emails on the user's behalf.`;
+
+    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': ANTHROPIC_KEY,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
+      body: JSON.stringify({
+        model: selectedModel,
+        max_tokens: 1024,
+        messages: [{ role: 'user', content: analysisPrompt }]
+      })
+    });
+    if (!resp.ok) { const e = await resp.json().catch(()=>{}); throw new Error(e?.error?.message || `API ${resp.status}`); }
+    const data = await resp.json();
+    const profile = data.content?.find(c => c.type === 'text')?.text || '';
+
+    // Track tokens
+    if (data.usage) {
+      const pricing = getPricing(selectedModel);
+      sessionUsage.inputTokens  += data.usage.input_tokens  || 0;
+      sessionUsage.outputTokens += data.usage.output_tokens || 0;
+      sessionUsage.cost += ((data.usage.input_tokens||0) / 1e6) * pricing.input + ((data.usage.output_tokens||0) / 1e6) * pricing.output;
+      updateCostDisplay();
+    }
+
+    // Step 4: populate textarea for user to review
+    const existing = document.getElementById('user-profile-editor').value.trim();
+    document.getElementById('user-profile-editor').value = (existing ? existing + '\n\n' : '') + '## Writing Style (learned from sent emails)\n' + profile;
+    status.textContent = `✓ Style learned from ${emails.length} emails (${bodies.length} full bodies). Review and click Save Profile.`;
+  } catch(e) {
+    status.textContent = '❌ ' + e.message;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '✨ Learn from sent emails';
+  }
 }
 
 function addThinkingBlock(text) {
