@@ -10,9 +10,9 @@
 
 | Step | Feature | Complexity | Depends on | Status |
 |---|---|---|---|---|
-| 1 | Layout Rework | High | — | [ ] |
-| 2 | Email List | Medium | Step 1 | [ ] |
-| 3 | Reading Pane | Medium | Step 2 | [ ] |
+| 1 | Layout Rework | High | — | [x] |
+| 2 | Email List | Medium | Step 1 | [x] |
+| 3 | Reading Pane | Medium | Step 2 | [x] |
 | 4 | Daily Intelligence Dashboard | Medium | Steps 1–3 | [ ] |
 | 5 | Thread Synthesis Banners | Low | Step 3 | [ ] |
 | 6 | Gatekeeper / Semantic Quarantine | High | Step 4 | [ ] |
