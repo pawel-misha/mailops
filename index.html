@@ -235,6 +235,53 @@ body::before {
 .reader-action-btn.danger:hover { border-color: var(--danger); color: var(--danger); }
 .reader-loading { flex: 1; display: flex; align-items: center; justify-content: center; color: var(--muted); font-size: 12px; font-family: 'IBM Plex Mono', monospace; }
 
+/* ── DAILY INTELLIGENCE ── */
+.dashboard-header { display: flex; align-items: center; gap: 12px; padding: 14px 18px; border-bottom: 1px solid var(--border); flex-shrink: 0; background: var(--surface); }
+.dashboard-greeting { flex: 1; }
+.dashboard-greeting h2 { font-size: 15px; font-weight: 800; color: var(--text); }
+.dashboard-greeting p { font-size: 11px; font-family: 'IBM Plex Mono', monospace; color: var(--text2); margin-top: 2px; }
+.dashboard-refresh-btn { background: none; border: 1px solid var(--border2); border-radius: 7px; color: var(--muted); cursor: pointer; padding: 5px 9px; font-size: 11px; font-family: 'IBM Plex Mono', monospace; transition: all 0.15s; flex-shrink: 0; }
+.dashboard-refresh-btn:hover { border-color: var(--amber); color: var(--amber); }
+.dashboard-body { flex: 1; overflow-y: auto; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+.dashboard-body::-webkit-scrollbar { width: 3px; }
+.dashboard-body::-webkit-scrollbar-thumb { background: var(--border2); }
+.dashboard-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+.dashboard-card-label { padding: 7px 12px; border-bottom: 1px solid var(--border); font-size: 9px; font-family: 'IBM Plex Mono', monospace; text-transform: uppercase; letter-spacing: 0.12em; color: var(--muted); }
+.dashboard-priority-item { display: flex; align-items: flex-start; gap: 10px; padding: 9px 12px; border-bottom: 1px solid var(--border); cursor: pointer; transition: background 0.12s; font-size: 12px; color: var(--text); line-height: 1.5; }
+.dashboard-priority-item:last-child { border-bottom: none; }
+.dashboard-priority-item:hover { background: var(--surface2); }
+.priority-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; margin-top: 4px; }
+.dashboard-stats-grid { display: grid; grid-template-columns: 1fr 1fr; }
+.dashboard-stat { padding: 12px 14px; border-right: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+.dashboard-stat:nth-child(2n) { border-right: none; }
+.dashboard-stat:nth-child(3), .dashboard-stat:nth-child(4) { border-bottom: none; }
+.dashboard-stat-value { font-size: 20px; font-weight: 800; font-family: 'IBM Plex Mono', monospace; color: var(--amber); }
+.dashboard-stat-label { font-size: 10px; color: var(--text2); margin-top: 1px; }
+.dashboard-action-chips { display: flex; flex-wrap: wrap; gap: 6px; padding: 10px 12px; }
+.dashboard-action-chip { padding: 5px 11px; border-radius: 14px; background: var(--surface2); border: 1px solid var(--border2); font-size: 11px; color: var(--text2); cursor: pointer; transition: all 0.15s; }
+.dashboard-action-chip:hover { border-color: var(--amber); color: var(--amber); background: var(--amber-dim); }
+.dashboard-skeleton { flex: 1; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+.skeleton-block { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+.skeleton-line { height: 12px; background: linear-gradient(90deg, var(--surface2) 0%, var(--surface3) 50%, var(--surface2) 100%); background-size: 200% 100%; animation: shimmer 1.4s infinite; border-radius: 4px; margin: 10px 12px; }
+@keyframes shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
+.dashboard-error { flex: 1; display: flex; align-items: center; justify-content: center; color: var(--muted); font-size: 12px; font-family: 'IBM Plex Mono', monospace; padding: 20px; text-align: center; }
+
+/* ── GATEKEEPER ── */
+.quarantine-badge { display: inline-flex; align-items: center; justify-content: center; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px; background: var(--danger); color: #fff; font-size: 9px; font-weight: 700; font-family: 'IBM Plex Mono', monospace; margin-left: auto; }
+.quarantine-row { padding: 11px 14px; border-bottom: 1px solid var(--border); }
+.quarantine-verdict-row { display: flex; align-items: center; gap: 7px; margin-bottom: 3px; }
+.verdict-badge { font-size: 9px; font-family: 'IBM Plex Mono', monospace; padding: 2px 7px; border-radius: 10px; font-weight: 700; letter-spacing: 0.05em; flex-shrink: 0; }
+.verdict-phishing { background: rgba(224,85,85,0.15); color: var(--danger); border: 1px solid rgba(224,85,85,0.3); }
+.verdict-suspicious { background: rgba(246,173,85,0.15); color: var(--warning); border: 1px solid rgba(246,173,85,0.3); }
+.verdict-promo { background: var(--info-dim); color: var(--info); border: 1px solid rgba(91,156,246,0.2); }
+.quarantine-sender { font-size: 11px; font-family: 'IBM Plex Mono', monospace; color: var(--text2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.quarantine-subject { font-size: 11px; color: var(--text2); margin-bottom: 3px; }
+.quarantine-reason { font-size: 11px; color: var(--muted); margin-bottom: 7px; line-height: 1.5; }
+.quarantine-actions { display: flex; gap: 5px; }
+.quarantine-btn { padding: 4px 9px; border-radius: 6px; font-size: 10px; font-family: 'IBM Plex Mono', monospace; cursor: pointer; border: 1px solid var(--border2); background: var(--surface2); color: var(--text2); transition: all 0.15s; }
+.quarantine-btn:hover { border-color: var(--amber); color: var(--amber); }
+.quarantine-btn.danger:hover { border-color: var(--danger); color: var(--danger); }
+
 /* Input bar — full width at bottom */
 .input-area { padding: 12px 16px; border-top: 1px solid var(--border); background: var(--surface); flex-shrink: 0; }
 .input-row { display: flex; gap: 10px; align-items: flex-end; }
@@ -426,6 +473,15 @@ body::before {
     </div>
 
     <div class="settings-section">
+      <div class="settings-section-label">Gatekeeper</div>
+      <div class="preset-row">
+        <button class="preset-btn active" id="gatekeeper-on-btn" onclick="setGatekeeper(true, this)">On</button>
+        <button class="preset-btn" id="gatekeeper-off-btn" onclick="setGatekeeper(false, this)">Off</button>
+      </div>
+      <div class="settings-section-note">AI scans unknown senders and flags suspicious or phishing emails. Runs automatically on app load.</div>
+    </div>
+
+    <div class="settings-section">
       <div class="settings-section-label">About Me <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted)">— injected into every request</span></div>
       <textarea class="system-prompt-textarea" id="user-profile-editor" rows="5" spellcheck="false" placeholder="e.g. I'm Paweł, Technical PM in Gdańsk. I prefer concise, direct emails. My timezone is CET. I work mostly with engineers and product teams..."></textarea>
       <div class="system-prompt-actions">
@@ -476,6 +532,11 @@ body::before {
         <div class="qa" onclick="q('List all my Gmail filters and explain what each one does')"><span class="icon">🔧</span> Filters</div>
       </div>
       <div class="sidebar-section">
+        <div class="sidebar-label">Intelligence</div>
+        <div class="qa" onclick="showCenterPanel('dashboard')"><span class="icon">📊</span> Daily Briefing</div>
+        <div class="qa" id="quarantine-nav" onclick="showCenterPanel('quarantine')"><span class="icon">🛡</span> Quarantine <span class="quarantine-badge" id="quarantine-badge" style="display:none">0</span></div>
+      </div>
+      <div class="sidebar-section">
         <div class="sidebar-label">Cleanup</div>
         <div class="qa danger" onclick="q('Find all promotional emails and show me counts per sender, then help me delete the biggest ones')"><span class="icon">🗑️</span> Purge promotions</div>
         <div class="qa danger" onclick="q('Find and delete all social media notification emails (Pinterest, LinkedIn, Facebook, Twitter/X, Instagram)')"><span class="icon">🧹</span> Delete social noise</div>
@@ -491,8 +552,17 @@ body::before {
     <!-- CENTER PANEL -->
     <div class="center-panel">
       <div class="center-section active" id="center-dashboard">
-        <div class="dashboard">
-          <div class="welcome-msg" id="welcome">
+        <!-- header: shown once daily intelligence generates -->
+        <div class="dashboard-header" id="dashboard-header" style="display:none">
+          <div class="dashboard-greeting">
+            <h2 id="dashboard-greeting-text">Good morning</h2>
+            <p id="dashboard-subtext">Your daily briefing</p>
+          </div>
+          <button class="dashboard-refresh-btn" onclick="refreshDailyIntelligence()">↻ Refresh</button>
+        </div>
+        <!-- pre-auth welcome: replaced by skeleton once auth succeeds -->
+        <div class="dashboard" id="dashboard-pre-auth">
+          <div class="welcome-msg">
             <div class="big-icon">⌨</div>
             <h2>Full control of your <span>inbox</span></h2>
             <p>Search, read, send, delete, archive, label and organise your Gmail using plain language.</p>
@@ -504,6 +574,15 @@ body::before {
             </div>
           </div>
         </div>
+        <!-- skeleton shown while generating -->
+        <div class="dashboard-skeleton" id="dashboard-skeleton" style="display:none">
+          <div class="skeleton-block"><div class="skeleton-line" style="width:60%;height:14px"></div><div class="skeleton-line" style="width:40%"></div></div>
+          <div class="skeleton-block"><div class="skeleton-line" style="width:45%"></div><div class="skeleton-line"></div><div class="skeleton-line" style="width:80%"></div><div class="skeleton-line" style="width:70%"></div></div>
+          <div class="skeleton-block"><div class="dashboard-stats-grid"><div class="dashboard-stat"><div class="skeleton-line" style="width:40%;height:20px"></div><div class="skeleton-line" style="width:60%"></div></div><div class="dashboard-stat"><div class="skeleton-line" style="width:40%;height:20px"></div><div class="skeleton-line" style="width:60%"></div></div><div class="dashboard-stat"><div class="skeleton-line" style="width:40%;height:20px"></div><div class="skeleton-line" style="width:60%"></div></div><div class="dashboard-stat"><div class="skeleton-line" style="width:40%;height:20px"></div><div class="skeleton-line" style="width:60%"></div></div></div></div>
+          <div class="skeleton-block"><div class="skeleton-line" style="width:55%"></div><div class="skeleton-line" style="width:80%"></div></div>
+        </div>
+        <!-- generated dashboard content -->
+        <div class="dashboard-body" id="dashboard-content" style="display:none"></div>
       </div>
       <div class="center-section" id="center-email-list">
         <div class="email-list-header">
@@ -512,6 +591,13 @@ body::before {
         </div>
         <div class="email-list" id="email-list"></div>
         <div class="email-list-more" id="email-list-more"></div>
+      </div>
+      <div class="center-section" id="center-quarantine">
+        <div class="email-list-header">
+          <span class="email-list-title">🛡 Quarantine</span>
+          <span class="email-list-count" id="quarantine-count"></span>
+        </div>
+        <div id="quarantine-list" style="flex:1;overflow-y:auto"></div>
       </div>
     </div>
 
@@ -588,6 +674,8 @@ let temperature = 0.6;
 let maxTokens = 4096;
 let customSystem = null;
 let userProfile = '';
+let gatekeeperEnabled = true;
+let quarantineItems = []; // cached gatekeeper results
 
 // ── EMAIL LIST STATE ──
 let currentEmailList = [];
@@ -600,6 +688,7 @@ const synthesisCache = {}; // messageId → summary text
 function showCenterPanel(mode) {
   document.getElementById('center-dashboard').classList.toggle('active', mode === 'dashboard');
   document.getElementById('center-email-list').classList.toggle('active', mode === 'email-list');
+  document.getElementById('center-quarantine').classList.toggle('active', mode === 'quarantine');
 }
 
 function showRightPanel(mode) {
@@ -796,7 +885,7 @@ function saveState() {
     googleClientId: GOOGLE_CLIENT_ID,
     selectedModel, temperature, maxTokens,
     customSystem, userProfile,
-    webSearchEnabled, thinkingEnabled
+    webSearchEnabled, thinkingEnabled, gatekeeperEnabled
   }));
 }
 function loadState() {
@@ -811,6 +900,7 @@ function loadState() {
     if (s.userProfile)    userProfile = s.userProfile;
     if (s.webSearchEnabled) webSearchEnabled = s.webSearchEnabled;
     if (s.thinkingEnabled)  thinkingEnabled  = s.thinkingEnabled;
+    if (s.gatekeeperEnabled != null) gatekeeperEnabled = s.gatekeeperEnabled;
   } catch(e) { /* ignore corrupt state */ }
 }
 
@@ -906,6 +996,8 @@ async function startAuth() {
     updateModelCapUI(selectedModel);
     saveState();
     hideLoading();
+    // Kick off daily intelligence in background (non-blocking)
+    generateDailyIntelligence();
   } catch(e) { hideLoading(); showErr('Auth failed: ' + e.message); }
 }
 
@@ -1780,6 +1872,9 @@ function toggleSettings() {
     // Sync temperature slider to current value
     document.getElementById('temp-slider').value = temperature;
     document.getElementById('temp-val').textContent = temperature.toFixed(2);
+    // Sync gatekeeper toggle
+    document.getElementById('gatekeeper-on-btn').classList.toggle('active', gatekeeperEnabled);
+    document.getElementById('gatekeeper-off-btn').classList.toggle('active', !gatekeeperEnabled);
   }
 }
 
@@ -2119,6 +2214,333 @@ function resetMessages() {
   document.getElementById('messages').innerHTML = '';
   showCenterPanel('dashboard');
   showRightPanel('chat');
+}
+
+// ── GATEKEEPER SETTINGS ──
+function setGatekeeper(val, btn) {
+  gatekeeperEnabled = val;
+  document.getElementById('gatekeeper-on-btn').classList.toggle('active', val);
+  document.getElementById('gatekeeper-off-btn').classList.toggle('active', !val);
+  saveState();
+}
+
+// ── DAILY INTELLIGENCE ──
+const DAILY_INTEL_KEY = 'mailops_daily_intel';
+let dailyIntelLoading = false;
+
+async function generateDailyIntelligence(force = false) {
+  if (dailyIntelLoading) return;
+
+  // Show skeleton immediately
+  document.getElementById('dashboard-pre-auth').style.display = 'none';
+  document.getElementById('dashboard-skeleton').style.display = 'flex';
+  document.getElementById('dashboard-content').style.display = 'none';
+  document.getElementById('dashboard-header').style.display = 'flex';
+
+  // Check session cache (skip if forced refresh)
+  if (!force) {
+    const cached = sessionStorage.getItem(DAILY_INTEL_KEY);
+    if (cached) {
+      try {
+        const data = JSON.parse(cached);
+        renderDashboard(data);
+        return;
+      } catch { /* ignore bad cache */ }
+    }
+  }
+
+  dailyIntelLoading = true;
+  try {
+    // Greeting
+    const hour = new Date().getHours();
+    const greet = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
+    const firstName = userEmail.split('@')[0].split('.')[0];
+    const capFirst = firstName.charAt(0).toUpperCase() + firstName.slice(1);
+    document.getElementById('dashboard-greeting-text').textContent = `${greet}, ${capFirst}`;
+
+    // Run parallel Gmail queries
+    const today = new Date().toISOString().split('T')[0].replace(/-/g, '/');
+    const [unreadRes, flaggedRes, todayRes] = await Promise.allSettled([
+      executeTool('search_emails', { query: 'is:unread in:inbox', maxResults: 30 }),
+      executeTool('search_emails', { query: 'is:starred in:inbox', maxResults: 10 }),
+      executeTool('search_emails', { query: `after:${today} in:inbox`, maxResults: 20 })
+    ]);
+
+    const unread  = unreadRes.status  === 'fulfilled' ? (unreadRes.value.messages  || []) : [];
+    const flagged = flaggedRes.status === 'fulfilled' ? (flaggedRes.value.messages || []) : [];
+    const today_  = todayRes.status   === 'fulfilled' ? (todayRes.value.messages   || []) : [];
+
+    const unreadTotal = unreadRes.status === 'fulfilled' ? (unreadRes.value.estimatedTotal || unread.length) : 0;
+
+    // Build combined context for Claude
+    const emailSummary = [
+      unread.length  ? `UNREAD INBOX (${unreadTotal} total, showing ${unread.length}):\n`  + unread.map(e  => `- ${e.from||'?'}: "${e.subject}" — ${e.snippet||''}`).join('\n')  : 'No unread emails.',
+      flagged.length ? `STARRED:\n` + flagged.map(e => `- ${e.from||'?'}: "${e.subject}"`).join('\n') : '',
+      today_.length  ? `TODAY'S EMAILS:\n` + today_.map(e  => `- ${e.from||'?'}: "${e.subject}"`).join('\n')  : ''
+    ].filter(Boolean).join('\n\n');
+
+    const dateStr = new Date().toLocaleDateString('en-GB', { weekday:'long', day:'numeric', month:'long', year:'numeric' });
+
+    const briefingPrompt = `Today is ${dateStr}. The user's email is ${userEmail}.
+
+Here is their current inbox snapshot:
+${emailSummary}
+
+Generate a daily intelligence briefing as a JSON object with this exact structure (no markdown, just JSON):
+{
+  "subtext": "short subtitle e.g. '14 unread · 3 need action'",
+  "priority": [
+    { "text": "one-line action needed item", "messageId": "messageId if known else null", "dot": "red|amber|blue" }
+  ],
+  "stats": [
+    { "value": "number or text", "label": "category name" }
+  ],
+  "actions": [
+    { "label": "suggested action chip text", "query": "the chat command to run" }
+  ]
+}
+
+Rules:
+- priority: max 4 items, only real action-needed emails (replies needed, invoices, deadlines, alerts). Skip newsletters/promos.
+- stats: exactly 4 items (e.g. Unread, Urgent, Promos, Events)
+- actions: 2–3 actionable suggested commands the user can fire
+- Keep all text very concise
+- Return ONLY the JSON object, no explanation`;
+
+    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': ANTHROPIC_KEY,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
+      body: JSON.stringify({
+        model: selectedModel,
+        max_tokens: 800,
+        temperature: 0.3,
+        messages: [{ role: 'user', content: briefingPrompt }]
+      })
+    });
+
+    if (!resp.ok) throw new Error(`API ${resp.status}`);
+    const apiData = await resp.json();
+
+    // Track tokens
+    if (apiData.usage) {
+      const p = getPricing(selectedModel);
+      sessionUsage.inputTokens  += apiData.usage.input_tokens  || 0;
+      sessionUsage.outputTokens += apiData.usage.output_tokens || 0;
+      sessionUsage.cost += ((apiData.usage.input_tokens||0)/1e6)*p.input + ((apiData.usage.output_tokens||0)/1e6)*p.output;
+      updateCostDisplay();
+    }
+
+    const raw = apiData.content?.find(c => c.type === 'text')?.text || '';
+    // Extract JSON from response (Claude sometimes wraps in ```json)
+    const jsonMatch = raw.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) throw new Error('No JSON in response');
+
+    const intel = JSON.parse(jsonMatch[0]);
+    intel._greeting = document.getElementById('dashboard-greeting-text').textContent;
+
+    // Cache in sessionStorage
+    sessionStorage.setItem(DAILY_INTEL_KEY, JSON.stringify(intel));
+
+    renderDashboard(intel);
+
+    // Run gatekeeper in background
+    if (gatekeeperEnabled) runGatekeeper(unread);
+
+  } catch(err) {
+    document.getElementById('dashboard-skeleton').style.display = 'none';
+    document.getElementById('dashboard-content').style.display = 'flex';
+    document.getElementById('dashboard-content').innerHTML = `<div class="dashboard-error">⚠ Could not generate briefing: ${escHtml(err.message)}<br><br><button class="dashboard-refresh-btn" onclick="refreshDailyIntelligence()" style="margin:0 auto">Try again</button></div>`;
+  } finally {
+    dailyIntelLoading = false;
+  }
+}
+
+function renderDashboard(intel) {
+  document.getElementById('dashboard-skeleton').style.display = 'none';
+  if (intel._greeting) document.getElementById('dashboard-greeting-text').textContent = intel._greeting;
+  if (intel.subtext)   document.getElementById('dashboard-subtext').textContent = intel.subtext;
+
+  const body = document.getElementById('dashboard-content');
+  body.style.display = 'flex';
+
+  const priorityHTML = (intel.priority || []).map(item => {
+    const dotColor = item.dot === 'red' ? 'var(--danger)' : item.dot === 'amber' ? 'var(--amber)' : 'var(--info)';
+    const clickAttr = item.messageId ? `onclick="openEmailById('${item.messageId}')"` : '';
+    return `<div class="dashboard-priority-item" ${clickAttr}><div class="priority-dot" style="background:${dotColor}"></div><span>${escHtml(item.text)}</span></div>`;
+  }).join('');
+
+  const statsHTML = (intel.stats || []).map(s =>
+    `<div class="dashboard-stat"><div class="dashboard-stat-value">${escHtml(String(s.value))}</div><div class="dashboard-stat-label">${escHtml(s.label)}</div></div>`
+  ).join('');
+
+  const actionsHTML = (intel.actions || []).map(a =>
+    `<button class="dashboard-action-chip" onclick="q(${JSON.stringify(a.query)})">${escHtml(a.label)}</button>`
+  ).join('');
+
+  body.innerHTML = `
+    ${priorityHTML ? `<div class="dashboard-card"><div class="dashboard-card-label">Priority</div>${priorityHTML}</div>` : ''}
+    ${statsHTML    ? `<div class="dashboard-card"><div class="dashboard-card-label">Today's Breakdown</div><div class="dashboard-stats-grid">${statsHTML}</div></div>` : ''}
+    ${actionsHTML  ? `<div class="dashboard-card"><div class="dashboard-card-label">Suggested Actions</div><div class="dashboard-action-chips">${actionsHTML}</div></div>` : ''}
+  `;
+}
+
+async function refreshDailyIntelligence() {
+  sessionStorage.removeItem(DAILY_INTEL_KEY);
+  quarantineItems = [];
+  document.getElementById('quarantine-badge').style.display = 'none';
+  document.getElementById('quarantine-list').innerHTML = '';
+  await generateDailyIntelligence(true);
+}
+
+// Open an email by its messageId (for dashboard priority item clicks)
+async function openEmailById(messageId) {
+  // Build a minimal email object and open it
+  try {
+    const m = await gFetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${messageId}?format=metadata&metadataHeaders=Subject&metadataHeaders=From&metadataHeaders=Date`);
+    const h = n => m.payload?.headers?.find(x=>x.name===n)?.value||'';
+    openEmail({ messageId: m.id, threadId: m.threadId, subject: h('Subject'), from: h('From'), date: h('Date'), labels: m.labelIds });
+  } catch(err) { console.error('openEmailById:', err); }
+}
+
+// ── GATEKEEPER ──
+async function runGatekeeper(recentEmails) {
+  if (!gatekeeperEnabled || !recentEmails.length) return;
+
+  // Filter to emails that look like they could be unknown senders
+  // (quick heuristic: no-reply, unknown domains, display name mismatch)
+  const candidates = recentEmails.filter(e => {
+    const from = (e.from || '').toLowerCase();
+    const senderEmail = from.match(/<(.+?)>/)?.[1] || from;
+    const displayName = from.replace(/<.+?>/, '').trim().replace(/"/g, '');
+    const domain = senderEmail.split('@')[1] || '';
+    // Skip obvious legit sources and already known senders
+    const skipDomains = ['gmail.com', 'google.com', 'googlemail.com'];
+    if (skipDomains.includes(domain)) return false;
+    // Flag if noreply/no-reply, unfamiliar domain, or display name doesn't match domain
+    const isNoreply = /noreply|no-reply|donotreply/.test(senderEmail);
+    const nameDomainMismatch = displayName.length > 0 && !domain.includes(displayName.toLowerCase().split(' ')[0].substring(0, 4));
+    return isNoreply || nameDomainMismatch;
+  }).slice(0, 8); // cap at 8 to limit API cost
+
+  if (!candidates.length) return;
+
+  const emailList = candidates.map((e, i) =>
+    `[${i+1}] From: ${e.from||'?'}\nSubject: ${e.subject||''}\nSnippet: ${e.snippet||''}`
+  ).join('\n\n');
+
+  try {
+    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': ANTHROPIC_KEY,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
+      body: JSON.stringify({
+        model: selectedModel,
+        max_tokens: 600,
+        temperature: 0.2,
+        messages: [{ role: 'user', content: `Evaluate these emails for trustworthiness. Return a JSON array (no markdown):
+[
+  { "index": 1, "verdict": "legitimate|promotional|suspicious|phishing", "confidence": 0-100, "reason": "one short sentence" }
+]
+
+Emails to evaluate:
+${emailList}
+
+Verdicts: legitimate = normal business email, promotional = marketing/offers, suspicious = could be scam/misleading, phishing = credential/payment theft attempt.
+Return ONLY the JSON array.` }]
+      })
+    });
+    if (!resp.ok) return;
+    const data = await resp.json();
+
+    if (data.usage) {
+      const p = getPricing(selectedModel);
+      sessionUsage.inputTokens  += data.usage.input_tokens  || 0;
+      sessionUsage.outputTokens += data.usage.output_tokens || 0;
+      sessionUsage.cost += ((data.usage.input_tokens||0)/1e6)*p.input + ((data.usage.output_tokens||0)/1e6)*p.output;
+      updateCostDisplay();
+    }
+
+    const raw = data.content?.find(c => c.type === 'text')?.text || '';
+    const arrMatch = raw.match(/\[[\s\S]*\]/);
+    if (!arrMatch) return;
+    const verdicts = JSON.parse(arrMatch[0]);
+
+    // Only keep suspicious/phishing/promotional (not legitimate)
+    const flagged = verdicts
+      .filter(v => v.verdict !== 'legitimate')
+      .map(v => {
+        const email = candidates[v.index - 1];
+        return email ? { ...email, verdict: v.verdict, confidence: v.confidence, reason: v.reason } : null;
+      })
+      .filter(Boolean);
+
+    if (!flagged.length) return;
+
+    quarantineItems = flagged;
+    renderQuarantine(flagged);
+
+    // Show badge
+    const badge = document.getElementById('quarantine-badge');
+    badge.textContent = flagged.length;
+    badge.style.display = 'inline-flex';
+
+  } catch(err) { console.error('Gatekeeper error:', err); }
+}
+
+function renderQuarantine(items) {
+  const list = document.getElementById('quarantine-list');
+  if (!items.length) {
+    list.innerHTML = '<div style="padding:24px;text-align:center;color:var(--muted);font-size:12px;font-family:\'IBM Plex Mono\',monospace">✓ No suspicious emails detected</div>';
+    document.getElementById('quarantine-count').textContent = '0 flagged';
+    return;
+  }
+  document.getElementById('quarantine-count').textContent = `${items.length} flagged`;
+  list.innerHTML = items.map((item, idx) => {
+    const vClass = item.verdict === 'phishing' ? 'verdict-phishing' : item.verdict === 'suspicious' ? 'verdict-suspicious' : 'verdict-promo';
+    const vLabel = item.verdict.toUpperCase();
+    return `<div class="quarantine-row" id="qrow-${idx}">
+      <div class="quarantine-verdict-row">
+        <span class="verdict-badge ${vClass}">${vLabel}</span>
+        <span class="quarantine-sender">${escHtml(item.from || '?')}</span>
+      </div>
+      <div class="quarantine-subject">${escHtml(item.subject || '(no subject)')}</div>
+      <div class="quarantine-reason">${escHtml(item.reason || '')} · ${item.confidence}% confidence</div>
+      <div class="quarantine-actions">
+        <button class="quarantine-btn" onclick="quarantineAction('letthrough', ${idx})">✓ Let through</button>
+        <button class="quarantine-btn danger" onclick="quarantineAction('spam', ${idx})">🚫 Spam</button>
+        ${item.verdict === 'phishing' || item.verdict === 'suspicious'
+          ? `<button class="quarantine-btn danger" onclick="quarantineAction('trash', ${idx})">🗑 Delete</button>`
+          : `<button class="quarantine-btn danger" onclick="quarantineAction('trash', ${idx})">🗑 Delete</button>`}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function quarantineAction(action, idx) {
+  const item = quarantineItems[idx];
+  if (!item) return;
+  const row = document.getElementById(`qrow-${idx}`);
+  try {
+    if (action === 'spam')      await executeTool('move_to_spam', { messageIds: [item.messageId] });
+    if (action === 'trash')     await executeTool('trash_emails', { messageIds: [item.messageId], confirmed: true });
+    if (action === 'letthrough') { /* just remove from quarantine view */ }
+    row?.remove();
+    quarantineItems.splice(idx, 1);
+    // Re-render remaining with fresh indices
+    renderQuarantine(quarantineItems);
+    const badge = document.getElementById('quarantine-badge');
+    if (quarantineItems.length) { badge.textContent = quarantineItems.length; badge.style.display = 'inline-flex'; }
+    else badge.style.display = 'none';
+  } catch(err) { console.error('quarantineAction:', err); }
 }
 
 // ── INIT ── run after all functions defined
