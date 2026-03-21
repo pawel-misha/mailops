@@ -235,6 +235,24 @@ body::before {
 .reader-action-btn.danger:hover { border-color: var(--danger); color: var(--danger); }
 .reader-loading { flex: 1; display: flex; align-items: center; justify-content: center; color: var(--muted); font-size: 12px; font-family: 'IBM Plex Mono', monospace; }
 
+/* Thread view */
+.thread-container { flex: 1; overflow-y: auto; }
+.thread-container::-webkit-scrollbar { width: 3px; }
+.thread-container::-webkit-scrollbar-thumb { background: var(--border2); }
+.thread-msg { border-bottom: 1px solid var(--border); }
+.thread-msg-hdr { display: flex; align-items: center; gap: 9px; padding: 10px 14px; cursor: pointer; transition: background 0.12s; user-select: none; }
+.thread-msg-hdr:hover { background: var(--surface2); }
+.thread-msg-avatar { width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; color: #fff; flex-shrink: 0; font-family: 'IBM Plex Mono', monospace; }
+.thread-msg-info { flex: 1; min-width: 0; }
+.thread-msg-from { font-size: 12px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.thread-msg-date { font-size: 10px; font-family: 'IBM Plex Mono', monospace; color: var(--muted); margin-top: 1px; }
+.thread-msg-toggle { font-size: 11px; color: var(--muted); flex-shrink: 0; transition: transform 0.15s; }
+.thread-msg-toggle.open { transform: rotate(180deg); }
+.thread-msg-body { display: none; border-top: 1px solid var(--border); }
+.thread-msg-body.open { display: block; }
+.thread-msg-iframe { width: 100%; border: none; background: #fff; min-height: 160px; display: block; }
+.thread-count-badge { font-size: 10px; font-family: 'IBM Plex Mono', monospace; color: var(--text2); background: var(--surface2); border: 1px solid var(--border2); border-radius: 10px; padding: 1px 8px; }
+
 /* ── DAILY INTELLIGENCE ── */
 .dashboard-header { display: flex; align-items: center; gap: 12px; padding: 14px 18px; border-bottom: 1px solid var(--border); flex-shrink: 0; background: var(--surface); }
 .dashboard-greeting { flex: 1; }
@@ -618,6 +636,7 @@ body::before {
         <div class="reader-meta">
           <div class="reader-meta-row"><span>From: </span><span id="reader-from">—</span></div>
           <div class="reader-meta-row"><span>Date: </span><span id="reader-date">—</span></div>
+          <div class="reader-meta-row" id="reader-thread-info" style="display:none"><span>Thread: </span><span id="reader-thread-count" class="thread-count-badge">1 message</span></div>
         </div>
         <div class="reader-synthesis" id="reader-synthesis"></div>
         <div class="reader-body">
@@ -679,8 +698,8 @@ let quarantineItems = []; // cached gatekeeper results
 
 // ── EMAIL LIST STATE ──
 let currentEmailList = [];
-let currentEmailPage = 0;
-const EMAIL_PAGE_SIZE = 20;
+let currentSearchQuery = '';
+let currentSearchNextToken = null;
 let currentOpenEmail = null; // { messageId, threadId, subject, from, date }
 const synthesisCache = {}; // messageId → summary text
 
@@ -714,37 +733,51 @@ function fmtDate(dateStr) {
   return d.toLocaleDateString([], {day:'numeric', month:'short'});
 }
 
-function renderEmailList(emails, query, total) {
+function renderEmailList(emails, query, total, nextPageToken) {
   if (!emails || emails.length === 0) return;
   currentEmailList = emails;
-  currentEmailPage = 0;
+  currentSearchQuery = query || '';
+  currentSearchNextToken = nextPageToken || null;
   showCenterPanel('email-list');
 
-  const title = query ? `"${query.replace(/^in:sent |^in:inbox /, '')}"` : 'Results';
+  const title = query ? `"${query.replace(/^in:sent |^in:inbox |^in:all /, '')}"` : 'Results';
   document.getElementById('email-list-title').textContent = title;
-  document.getElementById('email-list-count').textContent = total ? `~${total} total` : `${emails.length} emails`;
+  const countLabel = total && total > emails.length ? `${emails.length} of ~${total}` : `${emails.length} emails`;
+  document.getElementById('email-list-count').textContent = countLabel;
 
   const list = document.getElementById('email-list');
   list.innerHTML = '';
-  renderEmailPage(list, 0);
+  emails.forEach(email => list.appendChild(buildEmailRow(email)));
+  updateEmailListMore();
 }
 
-function renderEmailPage(list, page) {
-  const start = page * EMAIL_PAGE_SIZE;
-  const slice = currentEmailList.slice(start, start + EMAIL_PAGE_SIZE);
-  slice.forEach(email => list.appendChild(buildEmailRow(email)));
-  currentEmailPage = page;
-
+function updateEmailListMore() {
   const moreEl = document.getElementById('email-list-more');
-  const remaining = currentEmailList.length - (page + 1) * EMAIL_PAGE_SIZE;
-  moreEl.innerHTML = remaining > 0
-    ? `<button class="email-list-more-btn" onclick="loadMoreEmails()">Show ${Math.min(remaining, EMAIL_PAGE_SIZE)} more</button>`
+  moreEl.innerHTML = currentSearchNextToken
+    ? `<button class="email-list-more-btn" onclick="loadMoreFromGmail()">Load more from Gmail →</button>`
     : '';
 }
 
-function loadMoreEmails() {
-  const list = document.getElementById('email-list');
-  renderEmailPage(list, currentEmailPage + 1);
+async function loadMoreFromGmail() {
+  if (!currentSearchNextToken) return;
+  const moreEl = document.getElementById('email-list-more');
+  moreEl.innerHTML = '<div style="padding:8px 14px;font-size:11px;font-family:\'IBM Plex Mono\',monospace;color:var(--muted)">Loading…</div>';
+  try {
+    const result = await executeTool('search_emails', { query: currentSearchQuery, maxResults: 100, pageToken: currentSearchNextToken });
+    if (result.messages?.length) {
+      currentEmailList = [...currentEmailList, ...result.messages];
+      currentSearchNextToken = result.nextPageToken || null;
+      const list = document.getElementById('email-list');
+      result.messages.forEach(email => list.appendChild(buildEmailRow(email)));
+      document.getElementById('email-list-count').textContent = `${currentEmailList.length} emails`;
+      updateEmailListMore();
+    } else {
+      currentSearchNextToken = null;
+      updateEmailListMore();
+    }
+  } catch(err) {
+    moreEl.innerHTML = `<div style="padding:8px 14px;font-size:11px;color:var(--danger);font-family:'IBM Plex Mono',monospace">⚠ ${escHtml(err.message)}</div>`;
+  }
 }
 
 function buildEmailRow(email) {
@@ -790,7 +823,6 @@ async function quickEmailAction(e, action, messageId) {
 // ── READING PANE ──
 async function openEmail(email) {
   currentOpenEmail = email;
-  // Highlight selected row
   document.querySelectorAll('.email-row').forEach(r => r.classList.toggle('selected', r.dataset.messageId === email.messageId));
   showRightPanel('reader');
 
@@ -798,23 +830,135 @@ async function openEmail(email) {
   document.getElementById('reader-from').textContent = email.from || email.sender || '—';
   document.getElementById('reader-date').textContent = email.date ? new Date(email.date).toLocaleString() : '—';
   document.getElementById('reader-synthesis').classList.remove('show');
-  document.getElementById('reader-loading').style.display = 'flex';
-  document.getElementById('reader-iframe').style.display = 'none';
+  document.getElementById('reader-thread-info').style.display = 'none';
+
+  // Clear previous thread view
+  document.querySelectorAll('.thread-container').forEach(el => el.remove());
+  const loadingEl = document.getElementById('reader-loading');
+  const iframeEl  = document.getElementById('reader-iframe');
+  loadingEl.textContent = 'Loading thread…';
+  loadingEl.style.display = 'flex';
+  iframeEl.style.display = 'none';
 
   try {
-    const data = await executeTool('read_email', { messageId: email.messageId });
-    const html = data.body?.html || (data.body?.text ? `<pre style="white-space:pre-wrap;font-family:inherit">${escHtml(data.body.text)}</pre>` : '<p style="color:#8a9ab5">No content</p>');
-    const doc = `<!DOCTYPE html><html><head><base href="about:blank"><style>*{box-sizing:border-box}body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;line-height:1.65;color:#1a1a2e;background:#fff;padding:16px;margin:0}a{color:#2563eb}img{max-width:100%;height:auto}blockquote{border-left:3px solid #d1d5db;margin:0;padding-left:12px;color:#6b7280}pre{white-space:pre-wrap;background:#f3f4f6;padding:8px;border-radius:4px}</style></head><body>${html}</body></html>`;
-    const iframe = document.getElementById('reader-iframe');
-    iframe.srcdoc = doc;
-    iframe.style.display = 'block';
-    document.getElementById('reader-loading').style.display = 'none';
+    if (email.threadId) {
+      // Fetch full thread with all messages
+      const thread = await executeTool('read_thread', { threadId: email.threadId });
+      loadingEl.style.display = 'none';
 
-    // Thread synthesis
-    synthesiseThread(email.messageId, data.body?.text || data.body?.html || '');
+      // Update meta
+      if (thread.messageCount > 1) {
+        document.getElementById('reader-thread-count').textContent = `${thread.messageCount} messages`;
+        document.getElementById('reader-thread-info').style.display = 'block';
+        // Set From to the first sender
+        document.getElementById('reader-from').textContent = thread.messages[0]?.from || '—';
+      }
+
+      renderThread(thread, email.messageId);
+
+      // Synthesise using the latest message body
+      const latest = thread.messages[thread.messages.length - 1];
+      if (latest) synthesiseThread(email.messageId, latest.body?.text || latest.body?.html || '');
+    } else {
+      // No threadId — fall back to single message read
+      const data = await executeTool('read_email', { messageId: email.messageId });
+      loadingEl.style.display = 'none';
+      const bodyEl = document.getElementById('reader-body') || iframeEl.parentElement;
+      renderMessageIframe(bodyEl, data.body, true);
+      synthesiseThread(email.messageId, data.body?.text || data.body?.html || '');
+    }
   } catch(err) {
-    document.getElementById('reader-loading').textContent = '⚠ ' + err.message;
+    loadingEl.textContent = '⚠ ' + err.message;
+    loadingEl.style.display = 'flex';
   }
+}
+
+function renderThread(thread, activeMessageId) {
+  const readerBody = document.getElementById('reader-loading').parentElement;
+  const container = document.createElement('div');
+  container.className = 'thread-container';
+
+  thread.messages.forEach((msg, idx) => {
+    const isLatest = idx === thread.messages.length - 1;
+    const isActive = msg.messageId === activeMessageId || isLatest;
+    const senderName = (msg.from || '?').replace(/<.*>/, '').trim() || '?';
+    const initial = senderName[0].toUpperCase();
+    const color = senderColor(senderName);
+    const dateStr = msg.date ? new Date(msg.date).toLocaleString() : '';
+
+    const msgEl = document.createElement('div');
+    msgEl.className = 'thread-msg';
+    msgEl.innerHTML = `
+      <div class="thread-msg-hdr" onclick="toggleThreadMsg(this)">
+        <div class="thread-msg-avatar" style="background:${color}">${initial}</div>
+        <div class="thread-msg-info">
+          <div class="thread-msg-from">${escHtml(senderName)}</div>
+          <div class="thread-msg-date">${escHtml(dateStr)}</div>
+        </div>
+        <span class="thread-msg-toggle ${isActive ? 'open' : ''}">▾</span>
+      </div>
+      <div class="thread-msg-body ${isActive ? 'open' : ''}"></div>`;
+
+    const bodyDiv = msgEl.querySelector('.thread-msg-body');
+    if (isActive) renderMessageIframe(bodyDiv, msg.body, false);
+
+    // Lazy-render body on first expand
+    msgEl.querySelector('.thread-msg-hdr').addEventListener('click', () => {
+      if (bodyDiv.classList.contains('open') && !bodyDiv.dataset.rendered) {
+        renderMessageIframe(bodyDiv, msg.body, false);
+      }
+    });
+
+    container.appendChild(msgEl);
+  });
+
+  readerBody.appendChild(container);
+}
+
+function toggleThreadMsg(hdr) {
+  const bodyDiv = hdr.nextElementSibling;
+  const toggleIcon = hdr.querySelector('.thread-msg-toggle');
+  const isOpen = bodyDiv.classList.contains('open');
+  bodyDiv.classList.toggle('open', !isOpen);
+  toggleIcon.classList.toggle('open', !isOpen);
+  // Lazy render on first open
+  if (!isOpen && !bodyDiv.dataset.rendered) {
+    const msgEl = hdr.closest('.thread-msg');
+    // Body content already rendered at creation for active, lazy for others
+    if (!bodyDiv.querySelector('iframe') && !bodyDiv.querySelector('.thread-msg-text')) {
+      bodyDiv.dataset.rendered = '1';
+      // Body will be set by the lazy handler in renderThread
+    }
+  }
+}
+
+const EMAIL_IFRAME_CSS = `*{box-sizing:border-box}body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;line-height:1.65;color:#1a1a2e;background:#fff;padding:14px 16px;margin:0}a{color:#2563eb}img{max-width:100%;height:auto}blockquote{border-left:3px solid #d1d5db;margin:8px 0;padding-left:12px;color:#6b7280}pre{white-space:pre-wrap;background:#f3f4f6;padding:8px;border-radius:4px}`;
+
+function renderMessageIframe(container, body, fullHeight) {
+  if (!body) { container.innerHTML = '<div style="padding:12px 16px;color:#8a9ab5;font-size:13px">No content</div>'; return; }
+  const htmlContent = body.html || (body.text ? `<pre style="white-space:pre-wrap;font-family:inherit;font-size:13px;line-height:1.6">${escHtml(body.text)}</pre>` : null);
+  if (!htmlContent) { container.innerHTML = '<div style="padding:12px 16px;color:#8a9ab5;font-size:13px">No content</div>'; return; }
+  const doc = `<!DOCTYPE html><html><head><base href="about:blank"><style>${EMAIL_IFRAME_CSS}</style></head><body>${htmlContent}</body></html>`;
+  const iframe = document.createElement('iframe');
+  iframe.className = 'thread-msg-iframe';
+  iframe.sandbox = 'allow-same-origin';
+  if (fullHeight) {
+    // For single-message view: use the old reader-iframe slot
+    const old = document.getElementById('reader-iframe');
+    old.srcdoc = doc;
+    old.style.display = 'block';
+    return;
+  }
+  iframe.style.height = '200px'; // initial; auto-resizes on load
+  iframe.onload = () => {
+    try {
+      const h = iframe.contentDocument?.body?.scrollHeight;
+      if (h) iframe.style.height = Math.min(h + 20, 600) + 'px';
+    } catch {}
+  };
+  iframe.srcdoc = doc;
+  container.appendChild(iframe);
+  container.dataset.rendered = '1';
 }
 
 async function synthesiseThread(messageId, content) {
@@ -852,6 +996,9 @@ function showSynthesis(text) {
 function closeReader() {
   showRightPanel('chat');
   document.querySelectorAll('.email-row').forEach(r => r.classList.remove('selected'));
+  document.querySelectorAll('.thread-container').forEach(el => el.remove());
+  document.getElementById('reader-iframe').style.display = 'none';
+  document.getElementById('reader-thread-info').style.display = 'none';
   currentOpenEmail = null;
 }
 
@@ -1101,7 +1248,7 @@ const TOOLS = [
     description: 'Search Gmail messages. Returns subject, sender, date, snippet, messageId, threadId, labels.',
     input_schema: { type:'object', properties: {
       query: { type:'string', description:'Gmail search query. Examples: "from:netflix.com", "is:unread in:inbox", "category:promotions", "has:attachment after:2026/01/01"' },
-      maxResults: { type:'number', description:'1-500, default 20' },
+      maxResults: { type:'number', description:'1-500, default 100' },
       pageToken: { type:'string', description:'For pagination' },
       includeSpamTrash: { type:'boolean', description:'Include spam/trash, default false' }
     }, required:['query'] }
@@ -1346,7 +1493,7 @@ async function executeTool(name, input) {
   switch(name) {
 
     case 'search_emails': {
-      const max = Math.min(input.maxResults||20, 500);
+      const max = Math.min(input.maxResults||100, 500);
       let url = `https://gmail.googleapis.com/gmail/v1/users/me/messages?q=${encodeURIComponent(input.query)}&maxResults=${max}`;
       if (input.pageToken) url += `&pageToken=${input.pageToken}`;
       if (input.includeSpamTrash) url += '&includeSpamTrash=true';
@@ -1359,37 +1506,44 @@ async function executeTool(name, input) {
         const h = n => m.payload?.headers?.find(x=>x.name===n)?.value||'';
         return { messageId:m.id, threadId:m.threadId, subject:h('Subject')||'(no subject)', from:h('From'), to:h('To'), date:h('Date'), snippet:m.snippet?.substring(0,120), labels:m.labelIds };
       });
-      return { estimatedTotal:data.resultSizeEstimate, returned:messages.length, messages, nextPageToken:data.nextPageToken||null };
+      return { estimatedTotal:data.resultSizeEstimate, returned:messages.length, messages, nextPageToken:data.nextPageToken||null, _query:input.query };
     }
 
     case 'read_email': {
       const m = await gFetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${input.messageId}?format=full`);
       const h = n => m.payload?.headers?.find(x=>x.name===n)?.value||'';
-      let body = '';
+      let textBody = '', htmlBody = '';
       const extract = p => {
-        if ((p.mimeType==='text/plain') && p.body?.data) body += b64urlDecode(p.body.data);
+        if (p.mimeType==='text/plain'  && p.body?.data) textBody += b64urlDecode(p.body.data);
+        if (p.mimeType==='text/html'   && p.body?.data) htmlBody += b64urlDecode(p.body.data);
         if (p.parts) p.parts.forEach(extract);
       };
       extract(m.payload);
-      if (!body && m.payload?.body?.data) body = b64urlDecode(m.payload.body.data);
+      if (!textBody && !htmlBody && m.payload?.body?.data) textBody = b64urlDecode(m.payload.body.data);
       const attachments = [];
       const findAttachments = p => {
         if (p.filename && p.body?.attachmentId) attachments.push({ filename:p.filename, mimeType:p.mimeType, size:p.body.size, attachmentId:p.body.attachmentId });
         if (p.parts) p.parts.forEach(findAttachments);
       };
       findAttachments(m.payload);
-      return { messageId:m.id, threadId:m.threadId, subject:h('Subject'), from:h('From'), to:h('To'), date:h('Date'), cc:h('Cc'), replyTo:h('Reply-To'), messageIdHeader:h('Message-ID'), labels:m.labelIds, body:(body||'[no text body]').substring(0,4000)+(body.length>4000?'\n…[truncated]':''), attachments };
+      return { messageId:m.id, threadId:m.threadId, subject:h('Subject'), from:h('From'), to:h('To'), date:h('Date'), cc:h('Cc'), replyTo:h('Reply-To'), messageIdHeader:h('Message-ID'), labels:m.labelIds,
+        body: { text: (textBody||'').substring(0,4000), html: htmlBody||null }, attachments };
     }
 
     case 'read_thread': {
       const t = await gFetch(`https://gmail.googleapis.com/gmail/v1/users/me/threads/${input.threadId}?format=full`);
       const messages = t.messages.map(m => {
         const h = n => m.payload?.headers?.find(x=>x.name===n)?.value||'';
-        let body = '';
-        const extract = p => { if (p.mimeType==='text/plain'&&p.body?.data) body+=b64urlDecode(p.body.data); if(p.parts) p.parts.forEach(extract); };
+        let textBody = '', htmlBody = '';
+        const extract = p => {
+          if (p.mimeType==='text/plain' && p.body?.data) textBody += b64urlDecode(p.body.data);
+          if (p.mimeType==='text/html'  && p.body?.data) htmlBody += b64urlDecode(p.body.data);
+          if (p.parts) p.parts.forEach(extract);
+        };
         extract(m.payload);
-        if (!body && m.payload?.body?.data) body = b64urlDecode(m.payload.body.data);
-        return { messageId:m.id, from:h('From'), to:h('To'), date:h('Date'), subject:h('Subject'), body:(body||'[no text body]').substring(0,2000), labels:m.labelIds };
+        if (!textBody && !htmlBody && m.payload?.body?.data) textBody = b64urlDecode(m.payload.body.data);
+        return { messageId:m.id, from:h('From'), to:h('To'), date:h('Date'), subject:h('Subject'),
+          body: { text: (textBody||'').substring(0,3000), html: htmlBody||null }, labels:m.labelIds };
       });
       return { threadId:t.id, messageCount:messages.length, messages };
     }
@@ -2172,7 +2326,7 @@ function addToolCall(name, input) {
 function updateToolResult(el, result, isErr, toolName) {
   // Populate email list in center panel when search_emails succeeds
   if (!isErr && toolName === 'search_emails' && result.messages?.length > 0) {
-    renderEmailList(result.messages, result.query || '', result.estimatedTotal);
+    renderEmailList(result.messages, result._query || '', result.estimatedTotal, result.nextPageToken);
   }
   const status = el.querySelector('.tool-status');
   if (status) status.textContent = isErr ? '✗ error' : '✓ done';
@@ -2399,7 +2553,7 @@ async function refreshDailyIntelligence() {
 
 // Open an email by its messageId (for dashboard priority item clicks)
 async function openEmailById(messageId) {
-  // Build a minimal email object and open it
+  if (!messageId) return;
   try {
     const m = await gFetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${messageId}?format=metadata&metadataHeaders=Subject&metadataHeaders=From&metadataHeaders=Date`);
     const h = n => m.payload?.headers?.find(x=>x.name===n)?.value||'';
