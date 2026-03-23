@@ -5,7 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>MailOps — AI Email Command Center</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
 :root {
   --bg: #080a0f;
@@ -31,7 +32,7 @@
 }
 * { box-sizing: border-box; margin: 0; padding: 0; }
 html, body { height: 100%; }
-body { background: var(--bg); color: var(--text); font-family: 'Syne', sans-serif; overflow: hidden; }
+body { background: var(--bg); color: var(--text); font-family: 'Plus Jakarta Sans', sans-serif; overflow: hidden; }
 .mono { font-family: 'IBM Plex Mono', monospace; }
 
 body::after {
@@ -79,7 +80,7 @@ body::before {
 .field input:focus { border-color: var(--amber); box-shadow: 0 0 0 3px var(--amber-dim); }
 .field input::placeholder { color: var(--muted); }
 
-.btn { padding: 11px 20px; border-radius: 10px; border: none; font-family: 'Syne', sans-serif; font-size: 13px; font-weight: 700; cursor: pointer; transition: all 0.2s; display: inline-flex; align-items: center; gap: 8px; }
+.btn { padding: 11px 20px; border-radius: 10px; border: none; font-family: 'Plus Jakarta Sans', sans-serif; font-size: 13px; font-weight: 700; cursor: pointer; transition: all 0.2s; display: inline-flex; align-items: center; gap: 8px; }
 .btn-primary { background: var(--amber); color: #080a0f; }
 .btn-primary:hover { background: var(--amber-soft); transform: translateY(-1px); box-shadow: 0 4px 14px var(--amber-glow); }
 .btn-full { width: 100%; justify-content: center; }
@@ -118,7 +119,7 @@ body::before {
 .qa.danger:hover { background: var(--danger-dim); color: var(--danger); }
 .qa.warn:hover { background: rgba(246,173,85,0.1); color: var(--warning); }
 .sidebar-bottom { margin-top: auto; padding: 10px; }
-.disconnect-btn { width: 100%; padding: 7px; border-radius: 8px; background: transparent; border: 1px solid var(--border); color: var(--muted); font-size: 11px; font-family: 'Syne', sans-serif; font-weight: 600; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 6px; }
+.disconnect-btn { width: 100%; padding: 7px; border-radius: 8px; background: transparent; border: 1px solid var(--border); color: var(--muted); font-size: 11px; font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 600; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 6px; }
 .disconnect-btn:hover { border-color: var(--danger); color: var(--danger); }
 
 /* ── CENTER PANEL ── */
@@ -322,10 +323,23 @@ body::before {
 .quarantine-btn:hover { border-color: var(--amber); color: var(--amber); }
 .quarantine-btn.danger:hover { border-color: var(--danger); color: var(--danger); }
 
-/* Input bar — full width at bottom */
-.input-area { padding: 12px 16px; border-top: 1px solid var(--border); background: var(--surface); flex-shrink: 0; }
+/* Chat input — lives inside the right panel */
+.chat-input-wrap { padding: 12px 14px; border-top: 1px solid var(--border); background: var(--surface); flex-shrink: 0; }
 .input-row { display: flex; gap: 10px; align-items: flex-end; }
-#chat-input { flex: 1; padding: 10px 14px; background: var(--surface2); border: 1px solid var(--border2); border-radius: 12px; color: var(--text); font-family: 'Syne', sans-serif; font-size: 13px; outline: none; resize: none; transition: border-color 0.2s, box-shadow 0.2s; min-height: 42px; max-height: 130px; line-height: 1.5; }
+/* Panel resize handle */
+.panel-resize-handle { width: 4px; flex-shrink: 0; cursor: col-resize; background: var(--border); transition: background 0.15s; position: relative; z-index: 10; }
+.panel-resize-handle::before { content:''; position:absolute; inset:0 -6px; } /* widen hit area */
+.panel-resize-handle:hover, .panel-resize-handle.dragging { background: var(--amber); }
+/* Label tree */
+.label-group { }
+.label-group-hdr { display: flex; align-items: center; gap: 5px; padding: 5px 8px 5px 10px; border-radius: 8px; cursor: pointer; font-size: 12px; color: var(--text2); transition: all 0.12s; user-select: none; }
+.label-group-hdr:hover { background: var(--surface2); color: var(--text); }
+.label-group-hdr.active { background: var(--amber-dim); color: var(--amber); }
+.label-arrow { font-size: 8px; color: var(--muted); transition: transform 0.15s; flex-shrink: 0; display: inline-block; }
+.label-arrow.open { transform: rotate(90deg); }
+.label-group-name { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.label-group-children { }
+#chat-input { flex: 1; padding: 10px 14px; background: var(--surface2); border: 1px solid var(--border2); border-radius: 12px; color: var(--text); font-family: 'Plus Jakarta Sans', sans-serif; font-size: 13px; outline: none; resize: none; transition: border-color 0.2s, box-shadow 0.2s; min-height: 42px; max-height: 130px; line-height: 1.5; }
 #chat-input:focus { border-color: var(--amber); box-shadow: 0 0 0 3px var(--amber-dim); }
 #chat-input::placeholder { color: var(--muted); }
 .send-btn { width: 42px; height: 42px; border-radius: 12px; background: var(--amber); border: none; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s; font-size: 15px; flex-shrink: 0; }
@@ -707,6 +721,9 @@ body::before {
       </div>
     </div>
 
+    <!-- RESIZE HANDLE -->
+    <div class="panel-resize-handle" id="panel-resize-handle"></div>
+
     <!-- RIGHT PANEL -->
     <div class="right-panel">
       <div class="right-panel-tabs">
@@ -715,6 +732,13 @@ body::before {
       </div>
       <div class="right-panel-section active" id="right-chat">
         <div class="messages" id="messages"></div>
+        <div class="chat-input-wrap">
+          <div class="input-row">
+            <textarea id="chat-input" placeholder="Search, delete, reply, compose… just tell me what to do" rows="1" onkeydown="handleKey(event)" oninput="autoResize(this)"></textarea>
+            <button class="send-btn" id="send-btn" onclick="sendMessage()">➤</button>
+          </div>
+          <div class="input-hint">ENTER to send · SHIFT+ENTER for new line</div>
+        </div>
       </div>
       <div class="right-panel-section" id="right-reader">
         <div class="reader-header">
@@ -741,14 +765,6 @@ body::before {
     </div>
   </div>
 
-  <!-- INPUT BAR — full width -->
-  <div class="input-area">
-    <div class="input-row">
-      <textarea id="chat-input" placeholder="Search, delete, reply, compose… just tell me what to do" rows="1" onkeydown="handleKey(event)" oninput="autoResize(this)"></textarea>
-      <button class="send-btn" id="send-btn" onclick="sendMessage()">➤</button>
-    </div>
-    <div class="input-hint">ENTER to send · SHIFT+ENTER for new line</div>
-  </div>
 </div>
 
 <div class="loading-overlay" id="loading">
@@ -840,30 +856,84 @@ async function fetchLabels() {
   } catch(err) { console.warn('fetchLabels:', err.message); }
 }
 
+const expandedLabelGroups = new Set();
+
+function buildLabelTree(labels) {
+  const nodeMap = {};
+  const roots = [];
+  for (const lbl of labels) {
+    const parts = lbl.name.split('/');
+    let parentPath = '';
+    for (let i = 0; i < parts.length; i++) {
+      const path = parts.slice(0, i + 1).join('/');
+      if (!nodeMap[path]) {
+        const node = { name: parts[i], fullPath: path, label: null, children: [] };
+        nodeMap[path] = node;
+        if (i === 0) roots.push(node);
+        else nodeMap[parentPath].children.push(node);
+      }
+      if (i === parts.length - 1) nodeMap[path].label = lbl;
+      parentPath = path;
+    }
+  }
+  return roots;
+}
+
+function renderLabelTree(nodes, depth) {
+  let html = '';
+  for (const node of nodes) {
+    const hasKids = node.children.length > 0;
+    const lbl = node.label;
+    const isOpen = expandedLabelGroups.has(node.fullPath);
+    const active = lbl && lbl.id === currentLabelId ? ' active' : '';
+    const pl = `padding-left:${10 + depth * 11}px`;
+    const badge = lbl?.messagesUnread > 0 ? `<span class="sidebar-badge">${lbl.messagesUnread}</span>` : '';
+
+    if (hasKids) {
+      const lclick = lbl ? `onclick="setCurrentLabel('${escHtml(lbl.id)}')"` : '';
+      html += `<div class="label-group">`;
+      html += `<div class="label-group-hdr${active}" style="${pl}" onclick="toggleLabelGroup('${escHtml(node.fullPath)}',event)">`;
+      html += `<span class="label-arrow${isOpen?' open':''}">▶</span>`;
+      html += `<span class="label-group-name" ${lclick}>${escHtml(node.name)}</span>`;
+      html += badge;
+      html += `</div>`;
+      if (isOpen) html += `<div class="label-group-children">${renderLabelTree(node.children, depth + 1)}</div>`;
+      html += `</div>`;
+    } else if (lbl) {
+      html += `<div class="qa${active}" style="${pl}" data-label-id="${escHtml(lbl.id)}" onclick="setCurrentLabel('${escHtml(lbl.id)}')">`;
+      html += `<span class="icon" style="font-size:10px">🏷️</span> ${escHtml(node.name)}${badge}</div>`;
+    }
+  }
+  return html;
+}
+
+function toggleLabelGroup(fullPath, event) {
+  event?.stopPropagation();
+  if (expandedLabelGroups.has(fullPath)) expandedLabelGroups.delete(fullPath);
+  else expandedLabelGroups.add(fullPath);
+  renderLabels();
+}
+
 function renderLabels() {
   const container = document.getElementById('labels-nav');
   if (!container) return;
   const systemOrder = ['INBOX','STARRED','SENT','DRAFTS','SPAM','TRASH'];
   const systemIcons = { INBOX:'📥', STARRED:'⭐', SENT:'📤', DRAFTS:'📝', SPAM:'🚫', TRASH:'🗑️' };
-  const userLbls = labelsCache.filter(l => l.type==='user').sort((a,b) => a.name.localeCompare(b.name));
 
   let html = '';
   for (const id of systemOrder) {
-    const lbl = labelsCache.find(l => l.id===id);
+    const lbl = labelsCache.find(l => l.id === id);
     if (!lbl) continue;
     const badge = lbl.messagesUnread > 0 ? `<span class="sidebar-badge">${lbl.messagesUnread}</span>` : '';
     const active = id === currentLabelId ? ' active' : '';
     html += `<div class="qa${active}" data-label-id="${id}" onclick="setCurrentLabel('${id}')">` +
             `<span class="icon">${systemIcons[id]}</span> ${escHtml(formatLabelName(lbl.name))}${badge}</div>`;
   }
+
+  const userLbls = labelsCache.filter(l => l.type === 'user').sort((a, b) => a.name.localeCompare(b.name));
   if (userLbls.length) {
-    html += `<div class="sidebar-label" style="margin-top:6px;font-size:9px">My Labels</div>`;
-    for (const lbl of userLbls) {
-      const id = lbl.id;
-      const active = id === currentLabelId ? ' active' : '';
-      html += `<div class="qa${active}" data-label-id="${escHtml(id)}" onclick="setCurrentLabel(this.dataset.labelId)">` +
-              `<span class="icon">🏷️</span> ${escHtml(formatLabelName(lbl.name))}</div>`;
-    }
+    html += `<div class="sidebar-label" style="margin-top:8px;font-size:9px">My Labels</div>`;
+    html += renderLabelTree(buildLabelTree(userLbls), 0);
   }
   container.innerHTML = html;
 }
@@ -1183,7 +1253,7 @@ function renderMessageIframe(container, body, fullHeight) {
   if (!body) { container.innerHTML = '<div style="padding:12px 16px;color:#8a9ab5;font-size:13px">No content</div>'; return; }
   const htmlContent = body.html || (body.text ? `<pre style="white-space:pre-wrap;font-family:inherit;font-size:13px;line-height:1.6">${escHtml(body.text)}</pre>` : null);
   if (!htmlContent) { container.innerHTML = '<div style="padding:12px 16px;color:#8a9ab5;font-size:13px">No content</div>'; return; }
-  const doc = `<!DOCTYPE html><html><head><base href="about:blank"><style>${EMAIL_IFRAME_CSS}</style></head><body>${htmlContent}</body></html>`;
+  const doc = `<!DOCTYPE html><html><head><meta charset="utf-8"><base href="about:blank"><style>${EMAIL_IFRAME_CSS}</style></head><body>${htmlContent}</body></html>`;
   const iframe = document.createElement('iframe');
   iframe.className = 'thread-msg-iframe';
   iframe.sandbox = 'allow-same-origin';
@@ -1738,7 +1808,14 @@ async function gFetch(url, opts={}, _retry=0) {
 }
 
 function b64url(str) { return btoa(unescape(encodeURIComponent(str))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,''); }
-function b64urlDecode(s) { try { return atob(s.replace(/-/g,'+').replace(/_/g,'/')); } catch { return ''; } }
+function b64urlDecode(s) {
+  try {
+    const bin = atob(s.replace(/-/g,'+').replace(/_/g,'/').replace(/\s/g,''));
+    return decodeURIComponent(escape(bin)); // properly decodes UTF-8 (fixes Polish/accented chars)
+  } catch {
+    try { return atob(s.replace(/-/g,'+').replace(/_/g,'/')); } catch { return ''; }
+  }
+}
 
 function buildMimeEmail({ to, cc, bcc, subject, body, replyTo, threadId, inReplyTo, references }) {
   let headers = `To: ${to}\r\nSubject: =?UTF-8?B?${btoa(unescape(encodeURIComponent(subject)))}?=\r\nContent-Type: text/plain; charset=UTF-8\r\nMIME-Version: 1.0\r\n`;
@@ -3213,10 +3290,48 @@ async function quarantineAction(action, idx) {
 // ── INIT ──
 loadState();
 autoLogin();
+
 // Close model dropdown when clicking outside
 document.addEventListener('click', e => {
   if (!e.target.closest('#model-selector-wrap')) closeModelDropdown();
 });
+
+// ── PANEL RESIZE ──
+(function() {
+  const handle = document.getElementById('panel-resize-handle');
+  if (!handle) return;
+  let dragging = false, startX = 0, startW = 0;
+
+  handle.addEventListener('mousedown', e => {
+    dragging = true;
+    startX = e.clientX;
+    startW = document.querySelector('.center-panel').offsetWidth;
+    handle.classList.add('dragging');
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+    e.preventDefault();
+  });
+
+  document.addEventListener('mousemove', e => {
+    if (!dragging) return;
+    const dx = e.clientX - startX;
+    const sidebar = document.querySelector('.sidebar')?.offsetWidth || 200;
+    const minW = 260;
+    const maxW = window.innerWidth - sidebar - 360; // leave room for right panel
+    const w = Math.max(minW, Math.min(startW + dx, maxW));
+    const cp = document.querySelector('.center-panel');
+    cp.style.flex = 'none';
+    cp.style.width = w + 'px';
+  });
+
+  document.addEventListener('mouseup', () => {
+    if (!dragging) return;
+    dragging = false;
+    handle.classList.remove('dragging');
+    document.body.style.cursor = '';
+    document.body.style.userSelect = '';
+  });
+})();
 </script>
 </body>
 </html>
