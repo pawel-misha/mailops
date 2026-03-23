@@ -432,13 +432,33 @@ body::before {
         <!-- New account fields -->
         <div id="new-account-fields">
           <div class="field">
-            <label id="cid-label">Google OAuth Client ID</label>
-            <input type="text" id="google-client-id" placeholder="xxxxxxxx.apps.googleusercontent.com">
+            <label>Email Address</label>
+            <input type="email" id="signin-email" placeholder="you@gmail.com" autocomplete="email"
+              onkeydown="if(event.key==='Enter')startAuth()">
           </div>
           <button class="btn btn-primary btn-full" onclick="startAuth()">
             <span>🔐</span> Sign in with Google
           </button>
-          <p style="font-size:10px;color:var(--muted);text-align:center;margin-top:10px;line-height:1.5;font-family:'IBM Plex Mono',monospace">Add your Anthropic API key in Settings after sign-in to enable AI features</p>
+          <p style="font-size:10px;color:var(--muted);text-align:center;margin-top:10px;line-height:1.5;font-family:'IBM Plex Mono',monospace">
+            After sign-in, add your Anthropic API key in Settings to enable AI.
+          </p>
+          <!-- App config (hidden unless not set) -->
+          <div style="margin-top:12px;text-align:center">
+            <button onclick="toggleAppConfig()" id="app-config-toggle"
+              style="background:none;border:none;color:var(--muted);font-size:10px;cursor:pointer;font-family:'IBM Plex Mono',monospace;padding:2px 6px;border-radius:4px;transition:color 0.15s"
+              onmouseover="this.style.color='var(--text2)'" onmouseout="this.style.color='var(--muted)'">
+              ⚙ App configuration
+            </button>
+          </div>
+          <div id="app-config-section" style="display:none;margin-top:8px;padding:12px;background:var(--surface2);border:1px solid var(--border);border-radius:10px">
+            <div class="field" style="margin-bottom:6px">
+              <label>Google OAuth Client ID</label>
+              <input type="text" id="google-client-id" placeholder="xxxxxxxx.apps.googleusercontent.com">
+            </div>
+            <p style="font-size:9px;color:var(--muted);font-family:'IBM Plex Mono',monospace;line-height:1.5;margin:0">
+              Set once by the app owner. Google Cloud Console → APIs &amp; Services → Credentials.
+            </p>
+          </div>
         </div>
         <div class="error-msg" id="setup-error"></div>
       </div>
@@ -1374,15 +1394,25 @@ async function autoLogin() {
 }
 
 function initSetupScreen() {
+  // Auto-expand app config if Client ID not yet set
+  if (!GOOGLE_CLIENT_ID) {
+    document.getElementById('app-config-section').style.display = 'block';
+    document.getElementById('app-config-toggle').textContent = '⚙ Hide configuration';
+  }
   if (accounts.length > 0) {
     document.getElementById('reconnect-section').style.display = 'block';
-    const btnsEl = document.getElementById('reconnect-btns');
-    btnsEl.innerHTML = accounts.map((acc, idx) =>
+    document.getElementById('reconnect-btns').innerHTML = accounts.map((acc, idx) =>
       `<button class="btn btn-primary btn-full" style="margin-bottom:6px" onclick="reconnectAccount(${idx})">↩ Sign in as ${escHtml(acc.email)}</button>`
     ).join('');
-    document.getElementById('cid-label').textContent = 'Add another account — Client ID';
-    if (GOOGLE_CLIENT_ID) document.getElementById('google-client-id').value = GOOGLE_CLIENT_ID;
   }
+}
+
+function toggleAppConfig() {
+  const section = document.getElementById('app-config-section');
+  const btn = document.getElementById('app-config-toggle');
+  const show = section.style.display === 'none';
+  section.style.display = show ? 'block' : 'none';
+  btn.textContent = show ? '⚙ Hide configuration' : '⚙ App configuration';
 }
 
 async function reconnectAccount(idx) {
@@ -1400,13 +1430,20 @@ async function reconnectAccount(idx) {
 }
 
 async function startAuth() {
-  const cid = document.getElementById('google-client-id').value.trim();
+  const cidInput = (document.getElementById('google-client-id')?.value || '').trim();
+  const cid = cidInput || GOOGLE_CLIENT_ID;
+  if (!cid) {
+    document.getElementById('app-config-section').style.display = 'block';
+    document.getElementById('app-config-toggle').textContent = '⚙ Hide configuration';
+    return showErr('Enter the Google OAuth Client ID to configure this app (one-time setup)');
+  }
   if (!cid.includes('.apps.googleusercontent.com')) return showErr('Invalid Google Client ID format');
-  GOOGLE_CLIENT_ID = cid;
+  if (cidInput) GOOGLE_CLIENT_ID = cidInput; // save if freshly entered
+  const emailHint = (document.getElementById('signin-email')?.value || '').trim();
   document.getElementById('setup-error').classList.remove('show');
   showLoading('Signing in with Google…');
   try {
-    const token = await getToken(cid);
+    const token = await getToken(cid, false, emailHint);
     gmailToken = token;
     const profile = await gFetch('https://gmail.googleapis.com/gmail/v1/users/me/profile');
     const email = profile.emailAddress;
@@ -1560,14 +1597,17 @@ function switchSetupTab(tab) {
   document.getElementById('setup-tab-guide')?.classList.toggle('active', tab==='guide');
 }
 
-function getToken(cid, forceSelect) {
+function getToken(cid, forceSelect, loginHint) {
   return new Promise((res, rej) => {
     const client = google.accounts.oauth2.initTokenClient({
       client_id: cid,
       scope: GMAIL_SCOPE,
       callback: r => r.error ? rej(new Error(r.error)) : res(r.access_token)
     });
-    client.requestAccessToken(forceSelect ? { prompt: 'select_account' } : {});
+    const opts = {};
+    if (forceSelect) opts.prompt = 'select_account';
+    if (loginHint) opts.login_hint = loginHint;
+    client.requestAccessToken(opts);
   });
 }
 
@@ -1589,10 +1629,8 @@ function disconnect() {
   saveState();
   document.getElementById('setup-screen').style.display = 'flex';
   document.getElementById('app').classList.remove('visible');
-  // Reset setup screen to clean state
   document.getElementById('reconnect-section').style.display = 'none';
-  document.getElementById('google-client-id').value = '';
-  document.getElementById('cid-label').textContent = 'Google OAuth Client ID';
+  document.getElementById('signin-email').value = '';
   resetMessages();
 }
 
