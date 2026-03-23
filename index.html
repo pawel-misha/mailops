@@ -221,6 +221,13 @@ body::before {
 .reader-header { padding: 12px 14px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 10px; flex-shrink: 0; background: var(--surface); }
 .reader-back-btn { background: none; border: none; color: var(--text2); cursor: pointer; font-size: 16px; padding: 2px 4px; border-radius: 4px; transition: color 0.15s; flex-shrink: 0; }
 .reader-back-btn:hover { color: var(--amber); }
+.topbar-refresh { display: flex; align-items: center; gap: 6px; }
+.refresh-btn { background: none; border: 1px solid var(--border); border-radius: 6px; color: var(--text2); cursor: pointer; font-size: 15px; line-height: 1; padding: 3px 8px; transition: all 0.15s; }
+.refresh-btn:hover { border-color: var(--amber); color: var(--amber); }
+.refresh-btn.spinning { animation: spin-refresh 0.8s linear infinite; }
+@keyframes spin-refresh { to { transform: rotate(360deg); } }
+.refresh-time { font-size: 9px; font-family: 'IBM Plex Mono', monospace; color: var(--muted); white-space: nowrap; }
+.sidebar-badge { display: inline-flex; align-items: center; justify-content: center; min-width: 17px; height: 15px; border-radius: 7px; background: var(--amber-dim); color: var(--amber); font-size: 9px; font-family: 'IBM Plex Mono', monospace; font-weight: 700; padding: 0 4px; margin-left: auto; }
 .reader-subject { font-size: 13px; font-weight: 700; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text); }
 .reader-meta { padding: 10px 14px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
 .reader-meta-row { font-size: 11px; font-family: 'IBM Plex Mono', monospace; color: var(--text2); margin-bottom: 2px; }
@@ -455,6 +462,10 @@ body::before {
       <span class="cost-value" id="cost-value">$0.0000</span>
       <span class="cost-tokens" id="cost-tokens">0tok</span>
     </div>
+    <div class="topbar-refresh">
+      <button class="refresh-btn" id="refresh-btn" onclick="refreshCurrentLabel()" title="Refresh email list">↻</button>
+      <span class="refresh-time" id="refresh-time"></span>
+    </div>
     <button class="settings-btn" id="settings-btn" onclick="toggleSettings()">⚙ settings</button>
   </div>
 
@@ -500,6 +511,17 @@ body::before {
     </div>
 
     <div class="settings-section">
+      <div class="settings-section-label">Auto-Refresh</div>
+      <div class="preset-row" id="auto-refresh-btns">
+        <button class="preset-btn" onclick="setAutoRefresh(0,this)">Off</button>
+        <button class="preset-btn" onclick="setAutoRefresh(60000,this)">1 min</button>
+        <button class="preset-btn active" id="auto-refresh-5m" onclick="setAutoRefresh(300000,this)">5 min</button>
+        <button class="preset-btn" onclick="setAutoRefresh(900000,this)">15 min</button>
+      </div>
+      <div class="settings-section-note">Reload the email list in the background on the selected interval.</div>
+    </div>
+
+    <div class="settings-section">
       <div class="settings-section-label">About Me <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted)">— injected into every request</span></div>
       <textarea class="system-prompt-textarea" id="user-profile-editor" rows="5" spellcheck="false" placeholder="e.g. I'm Paweł, Technical PM in Gdańsk. I prefer concise, direct emails. My timezone is CET. I work mostly with engineers and product teams..."></textarea>
       <div class="system-prompt-actions">
@@ -527,26 +549,25 @@ body::before {
     <!-- SIDEBAR -->
     <div class="sidebar">
       <div class="sidebar-section">
-        <div class="sidebar-label">Read & Find</div>
-        <div class="qa" onclick="q('Show me my last 10 unread emails')"><span class="icon">📬</span> Unread inbox</div>
-        <div class="qa" onclick="q('What are my top 10 senders by email volume?')"><span class="icon">📊</span> Top senders</div>
-        <div class="qa" onclick="q('Find emails with attachments from this month')"><span class="icon">📎</span> Has attachments</div>
-        <div class="qa" onclick="q('Find unread emails from real people (not newsletters or automated)')"><span class="icon">👤</span> From real people</div>
-        <div class="qa" onclick="q('Show me starred emails')"><span class="icon">⭐</span> Starred</div>
-        <div class="qa" onclick="q('What emails are in my Sent folder from this week?')"><span class="icon">📤</span> Sent this week</div>
+        <div class="sidebar-label">Mail</div>
+        <div id="labels-nav">
+          <div class="qa active" data-label-id="INBOX" onclick="setCurrentLabel('INBOX')"><span class="icon">📥</span> Inbox</div>
+          <div class="qa" data-label-id="STARRED" onclick="setCurrentLabel('STARRED')"><span class="icon">⭐</span> Starred</div>
+          <div class="qa" data-label-id="SENT" onclick="setCurrentLabel('SENT')"><span class="icon">📤</span> Sent</div>
+          <div class="qa" data-label-id="DRAFTS" onclick="setCurrentLabel('DRAFTS')"><span class="icon">📝</span> Drafts</div>
+          <div class="qa" data-label-id="SPAM" onclick="setCurrentLabel('SPAM')"><span class="icon">🚫</span> Spam</div>
+          <div class="qa" data-label-id="TRASH" onclick="setCurrentLabel('TRASH')"><span class="icon">🗑️</span> Trash</div>
+        </div>
       </div>
       <div class="sidebar-section">
         <div class="sidebar-label">Compose</div>
         <div class="qa" onclick="q('I want to compose a new email. Ask me for: to, subject, and message body.')"><span class="icon">✏️</span> New email</div>
         <div class="qa" onclick="q('I want to reply to an email. First show me my recent unread so I can pick one.')"><span class="icon">↩️</span> Reply</div>
         <div class="qa" onclick="q('I want to forward an email. Show me recent emails to pick from.')"><span class="icon">↪️</span> Forward</div>
-        <div class="qa" onclick="q('Show me my drafts')"><span class="icon">📝</span> Drafts</div>
       </div>
       <div class="sidebar-section">
         <div class="sidebar-label">Organize</div>
-        <div class="qa" onclick="q('List all my Gmail labels')"><span class="icon">🏷️</span> Labels</div>
         <div class="qa" onclick="q('Mark all unread promotional emails as read')"><span class="icon">✓</span> Mark promos read</div>
-        <div class="qa" onclick="q('Show me all my email signatures')"><span class="icon">✍️</span> Signatures</div>
         <div class="qa" onclick="q('List all my Gmail filters and explain what each one does')"><span class="icon">🔧</span> Filters</div>
       </div>
       <div class="sidebar-section">
@@ -559,7 +580,6 @@ body::before {
         <div class="qa danger" onclick="q('Find all promotional emails and show me counts per sender, then help me delete the biggest ones')"><span class="icon">🗑️</span> Purge promotions</div>
         <div class="qa danger" onclick="q('Find and delete all social media notification emails (Pinterest, LinkedIn, Facebook, Twitter/X, Instagram)')"><span class="icon">🧹</span> Delete social noise</div>
         <div class="qa danger" onclick="q('Find newsletters I never read and help me bulk delete them.')"><span class="icon">📰</span> Clear newsletters</div>
-        <div class="qa warn" onclick="q('Show me what is in my spam folder')"><span class="icon">🚫</span> View spam</div>
         <div class="qa warn" onclick="q('Empty my trash folder — search for emails in trash and delete them permanently')"><span class="icon">🗑️</span> Empty trash</div>
       </div>
       <div class="sidebar-bottom">
@@ -700,6 +720,11 @@ let quarantineItems = []; // cached gatekeeper results
 let currentEmailList = [];
 let currentSearchQuery = '';
 let currentSearchNextToken = null;
+let currentLabelId = 'INBOX';
+let labelsCache = [];
+let autoRefreshMs = 300000; // 5 min default
+let autoRefreshTimer = null;
+let lastRefreshedAt = null;
 let currentOpenEmail = null; // { messageId, threadId, subject, from, date }
 const synthesisCache = {}; // messageId → summary text
 
@@ -733,6 +758,168 @@ function fmtDate(dateStr) {
   return d.toLocaleDateString([], {day:'numeric', month:'short'});
 }
 
+// ── DIRECT GMAIL: LABELS ──
+async function fetchLabels() {
+  try {
+    const data = await gFetch('https://gmail.googleapis.com/gmail/v1/users/me/labels');
+    labelsCache = data.labels || [];
+    renderLabels();
+  } catch(err) { console.warn('fetchLabels:', err.message); }
+}
+
+function renderLabels() {
+  const container = document.getElementById('labels-nav');
+  if (!container) return;
+  const systemOrder = ['INBOX','STARRED','SENT','DRAFTS','SPAM','TRASH'];
+  const systemIcons = { INBOX:'📥', STARRED:'⭐', SENT:'📤', DRAFTS:'📝', SPAM:'🚫', TRASH:'🗑️' };
+  const userLbls = labelsCache.filter(l => l.type==='user').sort((a,b) => a.name.localeCompare(b.name));
+
+  let html = '';
+  for (const id of systemOrder) {
+    const lbl = labelsCache.find(l => l.id===id);
+    if (!lbl) continue;
+    const badge = lbl.messagesUnread > 0 ? `<span class="sidebar-badge">${lbl.messagesUnread}</span>` : '';
+    const active = id === currentLabelId ? ' active' : '';
+    html += `<div class="qa${active}" data-label-id="${id}" onclick="setCurrentLabel('${id}')">` +
+            `<span class="icon">${systemIcons[id]}</span> ${escHtml(formatLabelName(lbl.name))}${badge}</div>`;
+  }
+  if (userLbls.length) {
+    html += `<div class="sidebar-label" style="margin-top:6px;font-size:9px">My Labels</div>`;
+    for (const lbl of userLbls) {
+      const id = lbl.id;
+      const active = id === currentLabelId ? ' active' : '';
+      html += `<div class="qa${active}" data-label-id="${escHtml(id)}" onclick="setCurrentLabel(this.dataset.labelId)">` +
+              `<span class="icon">🏷️</span> ${escHtml(formatLabelName(lbl.name))}</div>`;
+    }
+  }
+  container.innerHTML = html;
+}
+
+function formatLabelName(name) {
+  if (!name) return '';
+  return name.replace(/^CATEGORY_/,'').replace(/_/g,' ')
+    .split(' ').map(w => w[0]?.toUpperCase() + w.slice(1).toLowerCase()).join(' ');
+}
+
+function getLabelName(labelId) {
+  const l = labelsCache.find(l => l.id===labelId);
+  return l ? formatLabelName(l.name) : labelId;
+}
+
+function setCurrentLabel(labelId) {
+  currentLabelId = labelId;
+  document.querySelectorAll('#labels-nav .qa').forEach(el =>
+    el.classList.toggle('active', el.dataset.labelId === labelId)
+  );
+  fetchEmails(labelId);
+}
+
+// ── DIRECT GMAIL: FETCH EMAIL LIST ──
+async function fetchEmailMeta(messageId) {
+  try {
+    const m = await gFetch(
+      `https://gmail.googleapis.com/gmail/v1/users/me/messages/${messageId}` +
+      `?format=metadata&metadataHeaders=Subject&metadataHeaders=From&metadataHeaders=Date`
+    );
+    const h = n => m.payload?.headers?.find(x => x.name===n)?.value || '';
+    return { messageId:m.id, threadId:m.threadId, subject:h('Subject'), from:h('From'),
+      sender:h('From'), date:h('Date'), snippet:m.snippet||'', labels:m.labelIds||[],
+      isUnread:(m.labelIds||[]).includes('UNREAD') };
+  } catch { return null; }
+}
+
+async function fetchEmails(labelId = currentLabelId, pageToken = null) {
+  const isAppend = pageToken != null;
+  currentLabelId = labelId;
+
+  if (!isAppend) {
+    showCenterPanel('email-list');
+    document.getElementById('email-list-title').textContent = getLabelName(labelId) || labelId;
+    document.getElementById('email-list-count').textContent = 'loading…';
+    document.getElementById('email-list').innerHTML =
+      '<div style="padding:20px;text-align:center;color:var(--muted);font-size:11px;font-family:\'IBM Plex Mono\',monospace">Loading…</div>';
+    document.getElementById('email-list-more').innerHTML = '';
+    currentEmailList = [];
+    currentSearchNextToken = null;
+  }
+
+  const btn = document.getElementById('refresh-btn');
+  if (btn && !isAppend) btn.classList.add('spinning');
+
+  try {
+    let url = `https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=50&labelIds=${encodeURIComponent(labelId)}`;
+    if (pageToken) url += `&pageToken=${encodeURIComponent(pageToken)}`;
+    const data = await gFetch(url);
+
+    if (!data.messages?.length) {
+      if (!isAppend) {
+        document.getElementById('email-list').innerHTML =
+          '<div style="padding:24px;text-align:center;color:var(--muted);font-size:12px">No emails</div>';
+        document.getElementById('email-list-count').textContent = '0 emails';
+      }
+      currentSearchNextToken = null;
+      updateEmailListMore();
+      return;
+    }
+
+    // Fetch metadata in parallel, max 10 concurrent
+    const ids = data.messages.map(m => m.id);
+    const metas = [];
+    for (let i = 0; i < ids.length; i += 10) {
+      const chunk = ids.slice(i, i + 10);
+      const results = await Promise.all(chunk.map(fetchEmailMeta));
+      metas.push(...results.filter(Boolean));
+    }
+
+    currentSearchNextToken = data.nextPageToken || null;
+    const listEl = document.getElementById('email-list');
+
+    if (isAppend) {
+      currentEmailList = [...currentEmailList, ...metas];
+      metas.forEach(e => listEl.appendChild(buildEmailRow(e)));
+    } else {
+      currentEmailList = metas;
+      listEl.innerHTML = '';
+      metas.forEach(e => listEl.appendChild(buildEmailRow(e)));
+      const est = data.resultSizeEstimate || 0;
+      document.getElementById('email-list-count').textContent =
+        est > metas.length ? `${metas.length} of ~${est.toLocaleString()}` : `${metas.length} emails`;
+    }
+
+    updateEmailListMore();
+    lastRefreshedAt = new Date();
+    updateRefreshStatus();
+  } catch(err) {
+    if (!isAppend) {
+      document.getElementById('email-list').innerHTML =
+        `<div style="padding:24px;text-align:center;color:var(--danger);font-size:12px">⚠ ${escHtml(err.message)}</div>`;
+      document.getElementById('email-list-count').textContent = 'error';
+    }
+  } finally {
+    if (btn && !isAppend) btn.classList.remove('spinning');
+  }
+}
+
+async function refreshCurrentLabel() {
+  await Promise.all([fetchEmails(currentLabelId), fetchLabels()]);
+}
+
+function setAutoRefresh(ms, btn) {
+  autoRefreshMs = ms;
+  document.querySelectorAll('#auto-refresh-btns .preset-btn').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  if (autoRefreshTimer) clearInterval(autoRefreshTimer);
+  autoRefreshTimer = autoRefreshMs > 0 ? setInterval(() => refreshCurrentLabel(), autoRefreshMs) : null;
+  saveState();
+}
+
+function updateRefreshStatus() {
+  const el = document.getElementById('refresh-time');
+  if (!el || !lastRefreshedAt) { if (el) el.textContent = ''; return; }
+  const secs = Math.round((Date.now() - lastRefreshedAt) / 1000);
+  el.textContent = secs < 60 ? `${secs}s ago` : `${Math.round(secs/60)}m ago`;
+}
+
 function renderEmailList(emails, query, total, nextPageToken) {
   if (!emails || emails.length === 0) return;
   currentEmailList = emails;
@@ -762,22 +949,7 @@ async function loadMoreFromGmail() {
   if (!currentSearchNextToken) return;
   const moreEl = document.getElementById('email-list-more');
   moreEl.innerHTML = '<div style="padding:8px 14px;font-size:11px;font-family:\'IBM Plex Mono\',monospace;color:var(--muted)">Loading…</div>';
-  try {
-    const result = await executeTool('search_emails', { query: currentSearchQuery, maxResults: 100, pageToken: currentSearchNextToken });
-    if (result.messages?.length) {
-      currentEmailList = [...currentEmailList, ...result.messages];
-      currentSearchNextToken = result.nextPageToken || null;
-      const list = document.getElementById('email-list');
-      result.messages.forEach(email => list.appendChild(buildEmailRow(email)));
-      document.getElementById('email-list-count').textContent = `${currentEmailList.length} emails`;
-      updateEmailListMore();
-    } else {
-      currentSearchNextToken = null;
-      updateEmailListMore();
-    }
-  } catch(err) {
-    moreEl.innerHTML = `<div style="padding:8px 14px;font-size:11px;color:var(--danger);font-family:'IBM Plex Mono',monospace">⚠ ${escHtml(err.message)}</div>`;
-  }
+  await fetchEmails(currentLabelId, currentSearchNextToken);
 }
 
 function buildEmailRow(email) {
@@ -1032,7 +1204,8 @@ function saveState() {
     googleClientId: GOOGLE_CLIENT_ID,
     selectedModel, temperature, maxTokens,
     customSystem, userProfile,
-    webSearchEnabled, thinkingEnabled, gatekeeperEnabled
+    webSearchEnabled, thinkingEnabled, gatekeeperEnabled,
+    autoRefreshMs, currentLabelId
   }));
 }
 function loadState() {
@@ -1048,6 +1221,17 @@ function loadState() {
     if (s.webSearchEnabled) webSearchEnabled = s.webSearchEnabled;
     if (s.thinkingEnabled)  thinkingEnabled  = s.thinkingEnabled;
     if (s.gatekeeperEnabled != null) gatekeeperEnabled = s.gatekeeperEnabled;
+    if (s.autoRefreshMs != null) {
+      autoRefreshMs = s.autoRefreshMs;
+      // Sync auto-refresh buttons
+      const ms = autoRefreshMs;
+      document.querySelectorAll('#auto-refresh-btns .preset-btn').forEach(b => b.classList.remove('active'));
+      const map = { 0:'Off', 60000:'1 min', 300000:'5 min', 900000:'15 min' };
+      document.querySelectorAll('#auto-refresh-btns .preset-btn').forEach(b => {
+        if (b.textContent.trim() === (map[ms] || '')) b.classList.add('active');
+      });
+    }
+    if (s.currentLabelId) currentLabelId = s.currentLabelId;
   } catch(e) { /* ignore corrupt state */ }
 }
 
@@ -1143,6 +1327,12 @@ async function startAuth() {
     updateModelCapUI(selectedModel);
     saveState();
     hideLoading();
+    // Load labels + inbox directly via Gmail API
+    fetchLabels();
+    fetchEmails('INBOX');
+    // Start auto-refresh timer and "X ago" ticker
+    if (autoRefreshMs > 0) autoRefreshTimer = setInterval(() => refreshCurrentLabel(), autoRefreshMs);
+    setInterval(updateRefreshStatus, 15000);
     // Kick off daily intelligence in background (non-blocking)
     generateDailyIntelligence();
   } catch(e) { hideLoading(); showErr('Auth failed: ' + e.message); }
