@@ -2819,6 +2819,8 @@ BEHAVIOR:
 - User is Paweł, Technical PM in Gdańsk, Poland. His inbox: pawel.laban@gmail.com with ~1500+ unread, lots of promotional noise.`;
 
 async function callClaude(messages, onTextChunk, onThinkingChunk) {
+  if (!ANTHROPIC_KEY?.trim()) throw new Error('Anthropic API key not configured — open Settings to add your key');
+
   const tools = webSearchEnabled && MODEL_CAPS.supportsWebSearch(selectedModel)
     ? [...TOOLS, { type: 'web_search_20250305', name: 'web_search' }]
     : TOOLS;
@@ -2830,7 +2832,11 @@ async function callClaude(messages, onTextChunk, onThinkingChunk) {
     'anthropic-version': '2023-06-01',
     'anthropic-dangerous-direct-browser-access': 'true'
   };
-  if (useThinking) headers['anthropic-beta'] = 'interleaved-thinking-2025-05-14';
+  // claude-3-7-sonnet needs the beta header for interleaved thinking;
+  // claude-4+ has thinking built-in — adding the header there causes CORS failure
+  if (useThinking && /3-7-sonnet/.test(selectedModel)) {
+    headers['anthropic-beta'] = 'interleaved-thinking-2025-05-14';
+  }
 
   const systemText = buildSystemPrompt();
   const body = {
@@ -2845,7 +2851,12 @@ async function callClaude(messages, onTextChunk, onThinkingChunk) {
   };
   if (useThinking) body.thinking = { type: 'enabled', budget_tokens: 8000 };
 
-  const r = await fetch('https://api.anthropic.com/v1/messages', { method: 'POST', headers, body: JSON.stringify(body) });
+  let r;
+  try {
+    r = await fetch('https://api.anthropic.com/v1/messages', { method: 'POST', headers, body: JSON.stringify(body) });
+  } catch(netErr) {
+    throw new Error(`Cannot reach Anthropic API — check your internet connection (${netErr.message})`);
+  }
   if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error?.message || `API ${r.status}`); }
 
   const reader = r.body.getReader();
