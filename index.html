@@ -221,6 +221,21 @@ body::before {
 .reader-header { padding: 12px 14px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 10px; flex-shrink: 0; background: var(--surface); }
 .reader-back-btn { background: none; border: none; color: var(--text2); cursor: pointer; font-size: 16px; padding: 2px 4px; border-radius: 4px; transition: color 0.15s; flex-shrink: 0; }
 .reader-back-btn:hover { color: var(--amber); }
+.account-tabs { display: flex; align-items: center; gap: 4px; flex: 1; overflow-x: auto; min-width: 0; }
+.account-tabs::-webkit-scrollbar { display: none; }
+.account-tab { display: flex; align-items: center; gap: 5px; padding: 3px 8px 3px 5px; border-radius: 8px; cursor: pointer; border: 1px solid var(--border); transition: all 0.15s; font-size: 11px; color: var(--text2); font-family: 'IBM Plex Mono', monospace; white-space: nowrap; flex-shrink: 0; }
+.account-tab:hover { border-color: var(--border2); color: var(--text); background: var(--surface2); }
+.account-tab.active { background: var(--amber-dim); border-color: var(--amber); color: var(--amber); }
+.account-tab-avatar { width: 18px; height: 18px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 9px; font-weight: 700; color: #fff; flex-shrink: 0; }
+.account-tab-email { max-width: 130px; overflow: hidden; text-overflow: ellipsis; }
+.account-tab-x { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 13px; padding: 0 0 0 2px; line-height: 1; transition: color 0.12s; }
+.account-tab-x:hover { color: var(--danger); }
+.account-tab-add { background: none; border: 1px dashed var(--border2); border-radius: 7px; color: var(--muted); cursor: pointer; font-size: 10px; padding: 3px 8px; font-family: 'IBM Plex Mono', monospace; transition: all 0.15s; white-space: nowrap; flex-shrink: 0; }
+.account-tab-add:hover { border-color: var(--amber); color: var(--amber); }
+.settings-field-input { width: 100%; padding: 8px 10px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-family: 'IBM Plex Mono', monospace; font-size: 11px; outline: none; transition: border-color 0.2s; }
+.settings-field-input:focus { border-color: var(--amber); }
+.api-key-banner { background: var(--amber-dim); border: 1px solid rgba(240,165,0,0.3); border-radius: 10px; padding: 12px 16px; margin-bottom: 16px; font-size: 12px; color: var(--amber); font-family: 'IBM Plex Mono', monospace; display: none; cursor: pointer; }
+.api-key-banner.show { display: block; }
 .topbar-refresh { display: flex; align-items: center; gap: 6px; }
 .refresh-btn { background: none; border: 1px solid var(--border); border-radius: 6px; color: var(--text2); cursor: pointer; font-size: 15px; line-height: 1; padding: 3px 8px; transition: all 0.15s; }
 .refresh-btn:hover { border-color: var(--amber); color: var(--amber); }
@@ -388,7 +403,7 @@ body::before {
 
 <!-- SETUP -->
 <div id="setup-screen">
-  <div class="setup-container">
+  <div class="setup-container" style="max-width:480px">
     <div class="setup-logo">
       <div class="logo-mark">✉</div>
       <div class="logo-text">
@@ -398,32 +413,45 @@ body::before {
     </div>
     <div class="setup-card">
       <div class="setup-tabs">
-        <div class="setup-tab active" onclick="switchTab('credentials')">Credentials</div>
-        <div class="setup-tab" onclick="switchTab('guide')">Setup Guide</div>
+        <div class="setup-tab active" id="setup-tab-signin-btn" onclick="switchSetupTab('signin')">Sign In</div>
+        <div class="setup-tab" onclick="switchSetupTab('guide')">Setup Guide</div>
       </div>
-      <div class="setup-panel active" id="tab-credentials">
-        <div class="field">
-          <label>Anthropic API Key</label>
-          <input type="password" id="anthropic-key" placeholder="sk-ant-..." autocomplete="off">
+
+      <!-- Sign-in panel -->
+      <div class="setup-panel active" id="setup-tab-signin">
+        <!-- Reconnect buttons shown when returning user -->
+        <div id="reconnect-section" style="display:none">
+          <p style="font-size:11px;color:var(--text2);margin-bottom:10px;font-family:'IBM Plex Mono',monospace">Welcome back — sign in to continue</p>
+          <div id="reconnect-btns"></div>
+          <div style="display:flex;align-items:center;gap:8px;margin:12px 0">
+            <div style="flex:1;height:1px;background:var(--border)"></div>
+            <span style="font-size:10px;color:var(--muted);font-family:'IBM Plex Mono',monospace">or add account</span>
+            <div style="flex:1;height:1px;background:var(--border)"></div>
+          </div>
         </div>
-        <div class="field">
-          <label>Google OAuth Client ID</label>
-          <input type="text" id="google-client-id" placeholder="xxxxxxxx.apps.googleusercontent.com">
+        <!-- New account fields -->
+        <div id="new-account-fields">
+          <div class="field">
+            <label id="cid-label">Google OAuth Client ID</label>
+            <input type="text" id="google-client-id" placeholder="xxxxxxxx.apps.googleusercontent.com">
+          </div>
+          <button class="btn btn-primary btn-full" onclick="startAuth()">
+            <span>🔐</span> Sign in with Google
+          </button>
+          <p style="font-size:10px;color:var(--muted);text-align:center;margin-top:10px;line-height:1.5;font-family:'IBM Plex Mono',monospace">Add your Anthropic API key in Settings after sign-in to enable AI features</p>
         </div>
-        <button class="btn btn-primary btn-full" onclick="startAuth()">
-          <span>🔐</span> Connect Gmail
-        </button>
         <div class="error-msg" id="setup-error"></div>
       </div>
-      <div class="setup-panel" id="tab-guide">
-        <div style="margin-bottom:14px;font-size:12px;color:var(--text2);font-family:'IBM Plex Mono',monospace;padding:10px 12px;background:var(--amber-dim);border:1px solid rgba(240,165,0,0.2);border-radius:8px;">One-time setup · ~5 minutes · Free</div>
+
+      <!-- Guide panel -->
+      <div class="setup-panel" id="setup-tab-guide">
+        <div style="margin-bottom:14px;font-size:12px;color:var(--text2);font-family:'IBM Plex Mono',monospace;padding:10px 12px;background:var(--amber-dim);border:1px solid rgba(240,165,0,0.2);border-radius:8px;">One-time setup · ~5 minutes</div>
         <div class="step-item"><div class="step-num">1</div><div class="step-content"><h4>Google Cloud Console</h4><p>Go to <a href="https://console.cloud.google.com" target="_blank">console.cloud.google.com</a> → Create new project.</p></div></div>
         <div class="step-item"><div class="step-num">2</div><div class="step-content"><h4>Enable Gmail API</h4><p>APIs & Services → Library → search "Gmail API" → Enable.</p></div></div>
         <div class="step-item"><div class="step-num">3</div><div class="step-content"><h4>Create OAuth Client ID</h4><p>Credentials → Create → OAuth Client ID → <strong>Web Application</strong>.</p></div></div>
-        <div class="step-item"><div class="step-num">4</div><div class="step-content"><h4>Add Authorized Origin</h4><p>Add <code>http://localhost:3000</code> as authorized JS origin (no path).</p></div></div>
+        <div class="step-item"><div class="step-num">4</div><div class="step-content"><h4>Add Authorized Origin</h4><p>Add your site URL as authorized JS origin (no path, e.g. <code>https://yourdomain.com</code>).</p></div></div>
         <div class="step-item"><div class="step-num">5</div><div class="step-content"><h4>Add Test User</h4><p>OAuth Consent Screen → Test Users → add your Gmail address.</p></div></div>
-        <div class="step-item"><div class="step-num">6</div><div class="step-content"><h4>Run local server</h4><p>In the folder with this file run: <code>npx serve .</code> → open <code>http://localhost:3000/MailOps.html</code></p></div></div>
-        <div class="step-item"><div class="step-num">7</div><div class="step-content"><h4>Anthropic API Key</h4><p><a href="https://console.anthropic.com" target="_blank">console.anthropic.com</a> → API Keys → Create key.</p></div></div>
+        <div class="step-item"><div class="step-num">6</div><div class="step-content"><h4>Anthropic API Key</h4><p>After sign-in, open Settings (⚙) → add your key from <a href="https://console.anthropic.com" target="_blank">console.anthropic.com</a>.</p></div></div>
       </div>
     </div>
   </div>
@@ -437,10 +465,8 @@ body::before {
       <h1>Mail<span>Ops</span></h1>
     </div>
     <div class="topbar-divider"></div>
-    <div class="topbar-account">
-      <div class="account-dot"></div>
-      <span id="account-email">—</span>
-    </div>
+    <div class="account-tabs" id="account-tabs"></div>
+    <span id="account-email" style="display:none">—</span>
     <div class="topbar-stats">
       <div class="stat-chip danger"><span class="label">unread</span><span class="value mono" id="stat-unread">—</span></div>
       <div class="stat-chip"><span class="label">total</span><span class="value mono" id="stat-total">—</span></div>
@@ -473,8 +499,25 @@ body::before {
   <div class="settings-backdrop" id="settings-backdrop" onclick="toggleSettings()"></div>
   <div class="settings-panel" id="settings-panel">
     <div class="settings-panel-header">
-      <span>AI Settings</span>
+      <span>Settings</span>
       <button onclick="toggleSettings()">✕</button>
+    </div>
+
+    <div class="settings-section">
+      <div class="settings-section-label">Accounts</div>
+      <div id="settings-accounts-list" style="margin-bottom:8px"></div>
+      <button class="sp-btn" style="width:100%;justify-content:center;display:block" onclick="addAccount()">+ Add Google Account</button>
+    </div>
+
+    <div class="settings-section">
+      <div class="settings-section-label">Anthropic API Key</div>
+      <div style="margin-bottom:6px">
+        <input type="password" id="anthropic-key-settings" class="settings-field-input" placeholder="sk-ant-api03-..." autocomplete="off">
+      </div>
+      <div class="system-prompt-actions" style="margin-bottom:4px">
+        <button class="sp-btn primary" onclick="saveAnthropicKey()">Save Key</button>
+      </div>
+      <div class="settings-section-note" id="api-key-status"></div>
     </div>
 
     <div class="settings-section" id="temp-section">
@@ -715,6 +758,11 @@ let customSystem = null;
 let userProfile = '';
 let gatekeeperEnabled = true;
 let quarantineItems = []; // cached gatekeeper results
+
+// ── MULTI-ACCOUNT STATE ──
+let accounts = []; // [{email, clientId, token}]
+let activeAccountIdx = 0;
+const GMAIL_SCOPE = 'https://www.googleapis.com/auth/gmail.modify https://www.googleapis.com/auth/gmail.compose https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/gmail.labels https://www.googleapis.com/auth/gmail.settings.basic';
 
 // ── EMAIL LIST STATE ──
 let currentEmailList = [];
@@ -1202,6 +1250,8 @@ function saveState() {
   localStorage.setItem(LS, JSON.stringify({
     anthropicKey: ANTHROPIC_KEY,
     googleClientId: GOOGLE_CLIENT_ID,
+    accounts: accounts.map(a => ({ email: a.email, clientId: a.clientId })),
+    activeAccountIdx,
     selectedModel, temperature, maxTokens,
     customSystem, userProfile,
     webSearchEnabled, thinkingEnabled, gatekeeperEnabled,
@@ -1211,8 +1261,10 @@ function saveState() {
 function loadState() {
   try {
     const s = JSON.parse(localStorage.getItem(LS) || '{}');
-    if (s.anthropicKey)   { ANTHROPIC_KEY = s.anthropicKey;   document.getElementById('anthropic-key').value = s.anthropicKey; }
+    if (s.anthropicKey)   ANTHROPIC_KEY = s.anthropicKey;
     if (s.googleClientId) { GOOGLE_CLIENT_ID = s.googleClientId; document.getElementById('google-client-id').value = s.googleClientId; }
+    if (s.accounts?.length) accounts = s.accounts.map(a => ({ email:a.email, clientId:a.clientId||GOOGLE_CLIENT_ID, token:'' }));
+    if (s.activeAccountIdx != null) activeAccountIdx = Math.min(s.activeAccountIdx, Math.max(0, accounts.length-1));
     if (s.selectedModel)  selectedModel = s.selectedModel;
     if (s.temperature != null) { temperature = s.temperature; document.getElementById('temp-slider').value = temperature; document.getElementById('temp-val').textContent = temperature.toFixed(2); }
     if (s.maxTokens)      maxTokens = s.maxTokens;
@@ -1223,15 +1275,15 @@ function loadState() {
     if (s.gatekeeperEnabled != null) gatekeeperEnabled = s.gatekeeperEnabled;
     if (s.autoRefreshMs != null) {
       autoRefreshMs = s.autoRefreshMs;
-      // Sync auto-refresh buttons
-      const ms = autoRefreshMs;
-      document.querySelectorAll('#auto-refresh-btns .preset-btn').forEach(b => b.classList.remove('active'));
       const map = { 0:'Off', 60000:'1 min', 300000:'5 min', 900000:'15 min' };
-      document.querySelectorAll('#auto-refresh-btns .preset-btn').forEach(b => {
-        if (b.textContent.trim() === (map[ms] || '')) b.classList.add('active');
-      });
+      document.querySelectorAll('#auto-refresh-btns .preset-btn').forEach(b =>
+        b.classList.toggle('active', b.textContent.trim() === (map[autoRefreshMs]||''))
+      );
     }
     if (s.currentLabelId) currentLabelId = s.currentLabelId;
+    // Populate API key in settings
+    const keyInput = document.getElementById('anthropic-key-settings');
+    if (keyInput && ANTHROPIC_KEY) keyInput.value = ANTHROPIC_KEY;
   } catch(e) { /* ignore corrupt state */ }
 }
 
@@ -1304,73 +1356,243 @@ function onModelChange(val) {
   addMsg('assistant', `Model switched to **${val}**. Session reset.`);
 }
 
-// ── SETUP ──
-function switchTab(t) {
-  document.querySelectorAll('.setup-tab').forEach((el,i) => el.classList.toggle('active', (i===0&&t==='credentials')||(i===1&&t==='guide')));
-  document.querySelectorAll('.setup-panel').forEach((el,i) => el.classList.toggle('active', (i===0&&t==='credentials')||(i===1&&t==='guide')));
+// ── AUTH FLOW ──
+
+async function autoLogin() {
+  if (!accounts.length) { initSetupScreen(); return; }
+  showLoading('Reconnecting to Gmail…');
+  try {
+    const acc = accounts[activeAccountIdx];
+    const token = await silentTokenRefresh(acc.clientId);
+    acc.token = token;
+    gmailToken = token;
+    await loadApp();
+  } catch {
+    hideLoading();
+    initSetupScreen();
+  }
+}
+
+function initSetupScreen() {
+  if (accounts.length > 0) {
+    document.getElementById('reconnect-section').style.display = 'block';
+    const btnsEl = document.getElementById('reconnect-btns');
+    btnsEl.innerHTML = accounts.map((acc, idx) =>
+      `<button class="btn btn-primary btn-full" style="margin-bottom:6px" onclick="reconnectAccount(${idx})">↩ Sign in as ${escHtml(acc.email)}</button>`
+    ).join('');
+    document.getElementById('cid-label').textContent = 'Add another account — Client ID';
+    if (GOOGLE_CLIENT_ID) document.getElementById('google-client-id').value = GOOGLE_CLIENT_ID;
+  }
+}
+
+async function reconnectAccount(idx) {
+  activeAccountIdx = idx;
+  const acc = accounts[idx];
+  GOOGLE_CLIENT_ID = acc.clientId;
+  document.getElementById('setup-error').classList.remove('show');
+  showLoading('Signing in…');
+  try {
+    const token = await getToken(acc.clientId);
+    acc.token = token;
+    gmailToken = token;
+    await loadApp();
+  } catch(e) { hideLoading(); showErr('Sign in failed: ' + e.message); }
 }
 
 async function startAuth() {
-  const key = document.getElementById('anthropic-key').value.trim();
   const cid = document.getElementById('google-client-id').value.trim();
-  if (!key.startsWith('sk-ant-')) return showErr('Invalid Anthropic API key (should start with sk-ant-)');
   if (!cid.includes('.apps.googleusercontent.com')) return showErr('Invalid Google Client ID format');
-  ANTHROPIC_KEY = key; GOOGLE_CLIENT_ID = cid;
+  GOOGLE_CLIENT_ID = cid;
   document.getElementById('setup-error').classList.remove('show');
-  showLoading('Connecting to Gmail…');
+  showLoading('Signing in with Google…');
   try {
-    gmailToken = await getToken(cid);
-    await loadProfile();
-    document.getElementById('setup-screen').style.display = 'none';
-    document.getElementById('app').classList.add('visible');
-    await fetchModels();
-    updateModelCapUI(selectedModel);
+    const token = await getToken(cid);
+    gmailToken = token;
+    const profile = await gFetch('https://gmail.googleapis.com/gmail/v1/users/me/profile');
+    const email = profile.emailAddress;
+    const existIdx = accounts.findIndex(a => a.email === email);
+    if (existIdx >= 0) {
+      accounts[existIdx].token = token;
+      accounts[existIdx].clientId = cid;
+      activeAccountIdx = existIdx;
+    } else {
+      accounts.push({ email, clientId: cid, token });
+      activeAccountIdx = accounts.length - 1;
+    }
     saveState();
-    hideLoading();
-    // Load labels + inbox directly via Gmail API
-    fetchLabels();
-    fetchEmails('INBOX');
-    // Start auto-refresh timer and "X ago" ticker
-    if (autoRefreshMs > 0) autoRefreshTimer = setInterval(() => refreshCurrentLabel(), autoRefreshMs);
-    setInterval(updateRefreshStatus, 15000);
-    // Kick off daily intelligence in background (non-blocking)
-    generateDailyIntelligence();
+    await loadApp();
   } catch(e) { hideLoading(); showErr('Auth failed: ' + e.message); }
 }
 
-function getToken(cid) {
+async function loadApp() {
+  document.getElementById('setup-screen').style.display = 'none';
+  document.getElementById('app').classList.add('visible');
+  await fetchModels();
+  updateModelCapUI(selectedModel);
+  hideLoading();
+  renderAccountTabs();
+  loadProfile();
+  fetchLabels();
+  fetchEmails(currentLabelId || 'INBOX');
+  if (autoRefreshMs > 0) {
+    if (autoRefreshTimer) clearInterval(autoRefreshTimer);
+    autoRefreshTimer = setInterval(() => refreshCurrentLabel(), autoRefreshMs);
+  }
+  setInterval(updateRefreshStatus, 15000);
+  generateDailyIntelligence();
+  // First-time: open settings if no API key
+  if (!ANTHROPIC_KEY) {
+    setTimeout(() => {
+      toggleSettings();
+      setTimeout(() => document.getElementById('anthropic-key-settings')?.focus(), 300);
+    }, 700);
+  }
+}
+
+function renderAccountTabs() {
+  const container = document.getElementById('account-tabs');
+  if (!container) return;
+  let html = accounts.map((acc, idx) => {
+    const initial = (acc.email||'?')[0].toUpperCase();
+    const color = senderColor(acc.email||'');
+    const active = idx === activeAccountIdx ? ' active' : '';
+    const removeBtn = accounts.length > 1
+      ? `<button class="account-tab-x" onclick="removeAccount(${idx},event)" title="Remove account">×</button>` : '';
+    return `<div class="account-tab${active}" onclick="setActiveAccount(${idx})" title="${escHtml(acc.email)}">
+      <span class="account-tab-avatar" style="background:${color}">${initial}</span>
+      <span class="account-tab-email">${escHtml(acc.email)}</span>${removeBtn}
+    </div>`;
+  }).join('');
+  html += `<button class="account-tab-add" onclick="addAccount()" title="Add another Google account">+ account</button>`;
+  container.innerHTML = html;
+  renderSettingsAccounts();
+}
+
+function renderSettingsAccounts() {
+  const el = document.getElementById('settings-accounts-list');
+  if (!el) return;
+  if (!accounts.length) { el.innerHTML = ''; return; }
+  el.innerHTML = accounts.map((acc, idx) => {
+    const initial = (acc.email||'?')[0].toUpperCase();
+    const color = senderColor(acc.email||'');
+    const isActive = idx === activeAccountIdx;
+    const switchBtn = isActive ? `<span style="font-size:9px;color:var(--amber);font-family:'IBM Plex Mono',monospace">active</span>`
+      : `<button class="sp-btn" style="flex:none;padding:2px 8px;font-size:9px" onclick="setActiveAccount(${idx});toggleSettings()">switch</button>`;
+    const removeBtn = accounts.length > 1
+      ? `<button class="sp-btn" style="flex:none;padding:2px 6px;font-size:9px" onclick="removeAccount(${idx},event)">remove</button>` : '';
+    return `<div style="display:flex;align-items:center;gap:7px;padding:5px 8px;border-radius:7px;background:${isActive?'var(--amber-dim)':'var(--surface2)'};border:1px solid ${isActive?'var(--amber)':'var(--border2)'};margin-bottom:4px">
+      <span style="width:22px;height:22px;border-radius:50%;background:${color};display:inline-flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#fff;flex-shrink:0">${initial}</span>
+      <span style="flex:1;font-size:11px;font-family:'IBM Plex Mono',monospace;color:${isActive?'var(--amber)':'var(--text)'};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(acc.email)}</span>
+      ${switchBtn}${removeBtn}
+    </div>`;
+  }).join('');
+}
+
+async function addAccount() {
+  if (!GOOGLE_CLIENT_ID) {
+    document.getElementById('setup-screen').style.display = 'flex';
+    document.getElementById('app').classList.remove('visible');
+    initSetupScreen();
+    return;
+  }
+  showLoading('Adding account…');
+  try {
+    const token = await getToken(GOOGLE_CLIENT_ID, true); // force account picker
+    const r = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/profile',
+      { headers: { Authorization: `Bearer ${token}` } });
+    const profile = await r.json();
+    const email = profile.emailAddress;
+    const existIdx = accounts.findIndex(a => a.email === email);
+    if (existIdx >= 0) {
+      accounts[existIdx].token = token;
+      hideLoading();
+      setActiveAccount(existIdx);
+      return;
+    }
+    accounts.push({ email, clientId: GOOGLE_CLIENT_ID, token });
+    saveState();
+    hideLoading();
+    setActiveAccount(accounts.length - 1);
+  } catch(e) { hideLoading(); console.warn('addAccount:', e.message); }
+}
+
+function setActiveAccount(idx) {
+  if (idx < 0 || idx >= accounts.length) return;
+  activeAccountIdx = idx;
+  gmailToken = accounts[idx]?.token || '';
+  userEmail = accounts[idx]?.email || '';
+  document.getElementById('account-email').textContent = userEmail;
+  saveState();
+  renderAccountTabs();
+  // Clear caches from other account
+  Object.keys(synthesisCache).forEach(k => delete synthesisCache[k]);
+  labelsCache = [];
+  currentLabelId = 'INBOX';
+  fetchLabels();
+  fetchEmails('INBOX');
+}
+
+function removeAccount(idx, event) {
+  event?.stopPropagation();
+  if (accounts.length <= 1) return;
+  accounts.splice(idx, 1);
+  if (activeAccountIdx >= accounts.length) activeAccountIdx = accounts.length - 1;
+  saveState();
+  setActiveAccount(activeAccountIdx);
+}
+
+function saveAnthropicKey() {
+  const key = (document.getElementById('anthropic-key-settings')?.value || '').trim();
+  if (!key.startsWith('sk-ant-')) {
+    const s = document.getElementById('api-key-status');
+    s.textContent = '⚠ Key must start with sk-ant-'; s.style.color = 'var(--danger)'; return;
+  }
+  ANTHROPIC_KEY = key;
+  saveState();
+  const s = document.getElementById('api-key-status');
+  s.textContent = '✓ Saved'; s.style.color = 'var(--success)';
+  setTimeout(() => s.textContent = '', 3000);
+}
+
+function switchSetupTab(tab) {
+  document.querySelectorAll('.setup-tab').forEach((t,i) => t.classList.toggle('active', i===(tab==='guide'?1:0)));
+  document.getElementById('setup-tab-signin')?.classList.toggle('active', tab==='signin');
+  document.getElementById('setup-tab-guide')?.classList.toggle('active', tab==='guide');
+}
+
+function getToken(cid, forceSelect) {
   return new Promise((res, rej) => {
     const client = google.accounts.oauth2.initTokenClient({
       client_id: cid,
-      scope: [
-        'https://www.googleapis.com/auth/gmail.modify',
-        'https://www.googleapis.com/auth/gmail.compose',
-        'https://www.googleapis.com/auth/gmail.send',
-        'https://www.googleapis.com/auth/gmail.labels',
-        'https://www.googleapis.com/auth/gmail.settings.basic'
-      ].join(' '),
+      scope: GMAIL_SCOPE,
       callback: r => r.error ? rej(new Error(r.error)) : res(r.access_token)
     });
-    client.requestAccessToken();
+    client.requestAccessToken(forceSelect ? { prompt: 'select_account' } : {});
   });
 }
 
 async function loadProfile() {
-  const p = await gFetch('https://gmail.googleapis.com/gmail/v1/users/me/profile');
-  userEmail = p.emailAddress;
-  document.getElementById('account-email').textContent = userEmail;
-  document.getElementById('stat-total').textContent = (p.messagesTotal||0).toLocaleString();
-  const u = await gFetch('https://gmail.googleapis.com/gmail/v1/users/me/messages?q=is:unread+in:inbox&maxResults=1');
-  document.getElementById('stat-unread').textContent = (u.resultSizeEstimate||0).toLocaleString();
-  // Cache labels
-  const l = await gFetch('https://gmail.googleapis.com/gmail/v1/users/me/labels');
-  userLabels = l.labels || [];
+  try {
+    const p = await gFetch('https://gmail.googleapis.com/gmail/v1/users/me/profile');
+    userEmail = p.emailAddress;
+    document.getElementById('account-email').textContent = userEmail;
+    document.getElementById('stat-total').textContent = (p.messagesTotal||0).toLocaleString();
+    const u = await gFetch('https://gmail.googleapis.com/gmail/v1/users/me/messages?q=is:unread+in:inbox&maxResults=1');
+    document.getElementById('stat-unread').textContent = (u.resultSizeEstimate||0).toLocaleString();
+  } catch(e) { console.warn('loadProfile:', e); }
 }
 
 function disconnect() {
-  gmailToken = null; conversationHistory = [];
+  if (autoRefreshTimer) clearInterval(autoRefreshTimer);
+  accounts = []; activeAccountIdx = 0; gmailToken = null;
+  conversationHistory = [];
+  saveState();
   document.getElementById('setup-screen').style.display = 'flex';
   document.getElementById('app').classList.remove('visible');
+  // Reset setup screen to clean state
+  document.getElementById('reconnect-section').style.display = 'none';
+  document.getElementById('google-client-id').value = '';
+  document.getElementById('cid-label').textContent = 'Google OAuth Client ID';
   resetMessages();
 }
 
@@ -1379,12 +1601,13 @@ function showLoading(m) { document.getElementById('loading-text').textContent=m|
 function hideLoading() { document.getElementById('loading').classList.remove('show'); }
 
 // ── GMAIL API ──
-function silentTokenRefresh() {
+function silentTokenRefresh(clientId) {
+  const cid = clientId || accounts[activeAccountIdx]?.clientId || GOOGLE_CLIENT_ID;
   return new Promise((res, rej) => {
     try {
       const client = google.accounts.oauth2.initTokenClient({
-        client_id: GOOGLE_CLIENT_ID,
-        scope: ['https://www.googleapis.com/auth/gmail.modify','https://www.googleapis.com/auth/gmail.compose','https://www.googleapis.com/auth/gmail.send','https://www.googleapis.com/auth/gmail.labels','https://www.googleapis.com/auth/gmail.settings.basic'].join(' '),
+        client_id: cid,
+        scope: GMAIL_SCOPE,
         prompt: '',
         callback: r => r.error ? rej(new Error(r.error)) : res(r.access_token)
       });
@@ -1394,11 +1617,14 @@ function silentTokenRefresh() {
 }
 
 async function gFetch(url, opts={}, _retry=0) {
-  const r = await fetch(url, { ...opts, headers: { 'Authorization': `Bearer ${gmailToken}`, 'Content-Type': 'application/json', ...(opts.headers||{}) } });
+  const token = accounts[activeAccountIdx]?.token || gmailToken || '';
+  const r = await fetch(url, { ...opts, headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json', ...(opts.headers||{}) } });
   if (r.status===401) {
     if (_retry === 0) {
       try {
-        gmailToken = await silentTokenRefresh();
+        const newToken = await silentTokenRefresh();
+        if (accounts[activeAccountIdx]) accounts[activeAccountIdx].token = newToken;
+        gmailToken = newToken;
         return gFetch(url, opts, 1);
       } catch { throw new Error('Gmail session expired — please reconnect.'); }
     }
@@ -2030,8 +2256,11 @@ async function executeTool(name, input) {
 // ── CLAUDE API ──
 function buildSystemPrompt() {
   const base = customSystem || SYSTEM;
-  if (!userProfile.trim()) return base;
-  return base + `\n\n## About the User\n${userProfile.trim()}`;
+  const activeEmail = accounts[activeAccountIdx]?.email;
+  let extra = '';
+  if (activeEmail) extra += `\n\n## Active Gmail Account\n${activeEmail}`;
+  if (userProfile.trim()) extra += `\n\n## About the User\n${userProfile.trim()}`;
+  return base + extra;
 }
 
 const SYSTEM = `You are MailOps, a powerful AI email assistant with full access to the user's Gmail. You have ALL Gmail API capabilities.
@@ -2887,8 +3116,9 @@ async function quarantineAction(action, idx) {
   } catch(err) { console.error('quarantineAction:', err); }
 }
 
-// ── INIT ── run after all functions defined
+// ── INIT ──
 loadState();
+autoLogin();
 </script>
 </body>
 </html>
