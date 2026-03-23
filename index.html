@@ -178,7 +178,7 @@ body::before {
 .email-replied-icon { font-size: 10px; color: var(--success); flex-shrink: 0; }
 
 /* ── RIGHT PANEL ── */
-.right-panel { flex: 1; min-width: 340px; display: flex; flex-direction: column; overflow: hidden; }
+.right-panel { flex: 0 0 440px; min-width: 340px; display: flex; flex-direction: column; overflow: hidden; }
 .right-panel-tabs { display: flex; border-bottom: 1px solid var(--border); background: var(--surface); flex-shrink: 0; }
 .rp-tab { flex: 1; padding: 10px; font-size: 11px; font-family: 'IBM Plex Mono', monospace; color: var(--muted); background: none; border: none; border-bottom: 2px solid transparent; cursor: pointer; transition: all 0.15s; letter-spacing: 0.05em; }
 .rp-tab:hover { color: var(--text); }
@@ -3440,13 +3440,17 @@ document.addEventListener('click', e => {
     const dx = e.clientX - startX;
     const sidebar = document.querySelector('.sidebar')?.offsetWidth || 200;
     const handleW = document.getElementById('panel-resize-handle')?.offsetWidth || 8;
-    const minRightPanel = 340; // right panel min-width
+    const minRightPanel = 340;
     const minW = 260;
     const maxW = window.innerWidth - sidebar - minRightPanel - handleW - 4;
     const w = Math.max(minW, Math.min(startW + dx, maxW));
     const cp = document.querySelector('.center-panel');
+    const rp = document.querySelector('.right-panel');
     cp.style.flex = 'none';
     cp.style.width = w + 'px';
+    // Right panel fills whatever space remains after center panel resize
+    rp.style.flex = '1';
+    rp.style.width = '';
   });
 
   document.addEventListener('mouseup', () => {
@@ -3461,12 +3465,15 @@ document.addEventListener('click', e => {
 
 // Recalculate iframe heights in the right panel when layout changes
 function recalcIframeHeights() {
-  const iframes = document.querySelectorAll('.thread-msg-iframe, #reader-iframe');
-  iframes.forEach(iframe => {
-    try {
-      const h = iframe.contentDocument?.body?.scrollHeight;
-      if (h && h > 0) iframe.style.height = Math.min(h + 20, 800) + 'px';
-    } catch {}
+  // Use rAF so browser reflows iframe contents at new width before we measure
+  requestAnimationFrame(() => {
+    const iframes = document.querySelectorAll('.thread-msg-iframe, #reader-iframe');
+    iframes.forEach(iframe => {
+      try {
+        const h = iframe.contentDocument?.body?.scrollHeight;
+        if (h && h > 0) iframe.style.height = Math.min(h + 20, 800) + 'px';
+      } catch {}
+    });
   });
 }
 
@@ -3474,10 +3481,10 @@ function recalcIframeHeights() {
 (function() {
   const rp = document.querySelector('.right-panel');
   if (!rp || typeof ResizeObserver === 'undefined') return;
-  let lastW = rp.offsetWidth;
+  let lastW = 0;
   const ro = new ResizeObserver(entries => {
     for (const e of entries) {
-      const w = e.contentRect.width;
+      const w = Math.round(e.contentRect.width);
       if (Math.abs(w - lastW) > 4) { lastW = w; recalcIframeHeights(); }
     }
   });
