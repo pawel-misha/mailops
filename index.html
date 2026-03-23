@@ -171,9 +171,14 @@ body::before {
 .email-list-more { padding: 10px 14px; }
 .email-list-more-btn { width: 100%; padding: 8px; border-radius: 8px; background: var(--surface2); border: 1px solid var(--border2); color: var(--text2); font-size: 11px; font-family: 'IBM Plex Mono', monospace; cursor: pointer; transition: all 0.15s; }
 .email-list-more-btn:hover { border-color: var(--amber); color: var(--amber); }
+.email-row-meta { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; margin-top: 4px; }
+.email-label-chip { font-size: 9px; font-family: 'IBM Plex Mono', monospace; padding: 1px 5px; border-radius: 8px; background: var(--surface3); color: var(--text2); border: 1px solid var(--border2); white-space: nowrap; overflow: hidden; max-width: 90px; text-overflow: ellipsis; line-height: 1.6; }
+.email-thread-badge { font-size: 9px; font-family: 'IBM Plex Mono', monospace; color: var(--amber); background: var(--amber-dim); border: 1px solid var(--amber-glow); border-radius: 8px; padding: 1px 5px; flex-shrink: 0; line-height: 1.6; }
+.email-attach-icon { font-size: 10px; color: var(--muted); flex-shrink: 0; }
+.email-replied-icon { font-size: 10px; color: var(--success); flex-shrink: 0; }
 
 /* ── RIGHT PANEL ── */
-.right-panel { flex: 0 0 440px; min-width: 340px; display: flex; flex-direction: column; overflow: hidden; }
+.right-panel { flex: 1; min-width: 340px; display: flex; flex-direction: column; overflow: hidden; }
 .right-panel-tabs { display: flex; border-bottom: 1px solid var(--border); background: var(--surface); flex-shrink: 0; }
 .rp-tab { flex: 1; padding: 10px; font-size: 11px; font-family: 'IBM Plex Mono', monospace; color: var(--muted); background: none; border: none; border-bottom: 2px solid transparent; cursor: pointer; transition: all 0.15s; letter-spacing: 0.05em; }
 .rp-tab:hover { color: var(--text); }
@@ -271,6 +276,10 @@ body::before {
 .thread-msg-info { flex: 1; min-width: 0; }
 .thread-msg-from { font-size: 12px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .thread-msg-date { font-size: 10px; font-family: 'IBM Plex Mono', monospace; color: var(--muted); margin-top: 1px; }
+.thread-msg-preview { font-size: 10px; color: var(--muted); flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0 8px; display: block; }
+.thread-msg-preview.hidden { display: none; }
+.thread-msg-hdr-right { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+.thread-msg-attach { font-size: 10px; color: var(--muted); }
 .thread-msg-toggle { font-size: 11px; color: var(--muted); flex-shrink: 0; transition: transform 0.15s; }
 .thread-msg-toggle.open { transform: rotate(180deg); }
 .thread-msg-body { display: none; border-top: 1px solid var(--border); }
@@ -972,6 +981,13 @@ function setCurrentLabel(labelId) {
 }
 
 // ── DIRECT GMAIL: FETCH EMAIL LIST ──
+function detectAttachment(part) {
+  if (!part) return false;
+  if (part.filename && part.filename.length > 0) return true;
+  if (part.parts) { for (const p of part.parts) { if (detectAttachment(p)) return true; } }
+  return false;
+}
+
 async function fetchEmailMeta(messageId) {
   try {
     const m = await gFetch(
@@ -981,7 +997,8 @@ async function fetchEmailMeta(messageId) {
     const h = n => m.payload?.headers?.find(x => x.name===n)?.value || '';
     return { messageId:m.id, threadId:m.threadId, subject:h('Subject'), from:h('From'),
       sender:h('From'), date:h('Date'), snippet:m.snippet||'', labels:m.labelIds||[],
-      isUnread:(m.labelIds||[]).includes('UNREAD') };
+      isUnread:(m.labelIds||[]).includes('UNREAD'),
+      hasAttachment: detectAttachment(m.payload) };
   } catch { return null; }
 }
 
@@ -1032,6 +1049,19 @@ async function fetchEmails(labelId = currentLabelId, pageToken = null) {
     }
 
     currentSearchNextToken = data.nextPageToken || null;
+
+    // Annotate metas with thread count and replied status
+    const threadMsgCount = new Map();
+    const threadHasReply = new Map();
+    for (const meta of metas) {
+      threadMsgCount.set(meta.threadId, (threadMsgCount.get(meta.threadId) || 0) + 1);
+      if (meta.labels?.includes('SENT')) threadHasReply.set(meta.threadId, true);
+    }
+    for (const meta of metas) {
+      meta.threadCount = threadMsgCount.get(meta.threadId) || 1;
+      meta.hasReplied = threadHasReply.get(meta.threadId) || false;
+    }
+
     const listEl = document.getElementById('email-list');
 
     if (isAppend) {
@@ -1168,6 +1198,21 @@ function buildEmailRow(email) {
   const senderName = (email.from || email.sender || '?').replace(/<.*>/, '').trim() || '?';
   const initial = senderName[0].toUpperCase();
   const isUnread = email.labels?.includes('UNREAD') || false;
+
+  // User-defined labels (exclude system labels)
+  const userLabelNames = (email.labels || [])
+    .map(id => labelsCache.find(l => l.id === id))
+    .filter(l => l && l.type === 'user')
+    .map(l => l.name.split('/').pop()) // show leaf name only
+    .slice(0, 3);
+
+  const threadBadge  = (email.threadCount > 1) ? `<span class="email-thread-badge">[${email.threadCount}]</span>` : '';
+  const repliedIcon  = email.hasReplied  ? `<span class="email-replied-icon" title="You replied">↩</span>` : '';
+  const attachIcon   = email.hasAttachment ? `<span class="email-attach-icon" title="Has attachment">📎</span>` : '';
+  const labelChips   = userLabelNames.map(n => `<span class="email-label-chip">${escHtml(n)}</span>`).join('');
+  const metaRow      = (threadBadge || repliedIcon || attachIcon || labelChips)
+    ? `<div class="email-row-meta">${threadBadge}${repliedIcon}${attachIcon}${labelChips}</div>` : '';
+
   const row = document.createElement('div');
   row.className = 'email-row' + (isUnread ? ' unread' : '');
   row.dataset.messageId = email.messageId;
@@ -1183,6 +1228,7 @@ function buildEmailRow(email) {
         <span class="email-subject">${escHtml(email.subject || '(no subject)')}</span>
         <span class="email-snippet">&nbsp;— ${escHtml((email.snippet || '').slice(0, 80))}</span>
       </div>
+      ${metaRow}
     </div>
     <div class="email-row-actions">
       <button class="email-action-btn" title="Archive" onclick="quickEmailAction(event,'archive','${email.messageId}')">📦</button>
@@ -1269,6 +1315,9 @@ function renderThread(thread, activeMessageId) {
     const initial = senderName[0].toUpperCase();
     const color = senderColor(senderName);
     const dateStr = msg.date ? new Date(msg.date).toLocaleString() : '';
+    const isSent = msg.labels?.includes('SENT');
+    const hasAttach = msg.hasAttachment;
+    const snippetText = (msg.snippet || (msg.body?.text || '').replace(/\s+/g,' ').trim()).slice(0, 100);
 
     const msgEl = document.createElement('div');
     msgEl.className = 'thread-msg';
@@ -1276,20 +1325,30 @@ function renderThread(thread, activeMessageId) {
       <div class="thread-msg-hdr" onclick="toggleThreadMsg(this)">
         <div class="thread-msg-avatar" style="background:${color}">${initial}</div>
         <div class="thread-msg-info">
-          <div class="thread-msg-from">${escHtml(senderName)}</div>
+          <div class="thread-msg-from">${escHtml(senderName)}${isSent ? ' <span style="color:var(--success);font-size:9px;font-family:\'IBM Plex Mono\',monospace">SENT</span>' : ''}</div>
           <div class="thread-msg-date">${escHtml(dateStr)}</div>
         </div>
-        <span class="thread-msg-toggle ${isActive ? 'open' : ''}">▾</span>
+        <span class="thread-msg-preview${isActive ? ' hidden' : ''}">${escHtml(snippetText)}</span>
+        <div class="thread-msg-hdr-right">
+          ${hasAttach ? '<span class="thread-msg-attach" title="Has attachment">📎</span>' : ''}
+          <span class="thread-msg-toggle ${isActive ? 'open' : ''}">▾</span>
+        </div>
       </div>
       <div class="thread-msg-body ${isActive ? 'open' : ''}"></div>`;
 
     const bodyDiv = msgEl.querySelector('.thread-msg-body');
     if (isActive) renderMessageIframe(bodyDiv, msg.body, false);
 
-    // Lazy-render body on first expand
+    // Lazy-render body on first expand; toggle snippet visibility
     msgEl.querySelector('.thread-msg-hdr').addEventListener('click', () => {
-      if (bodyDiv.classList.contains('open') && !bodyDiv.dataset.rendered) {
-        renderMessageIframe(bodyDiv, msg.body, false);
+      const preview = msgEl.querySelector('.thread-msg-preview');
+      if (bodyDiv.classList.contains('open')) {
+        // Now open — hide preview
+        if (preview) preview.classList.add('hidden');
+        if (!bodyDiv.dataset.rendered) renderMessageIframe(bodyDiv, msg.body, false);
+      } else {
+        // Now closed — show preview
+        if (preview) preview.classList.remove('hidden');
       }
     });
 
@@ -1302,18 +1361,11 @@ function renderThread(thread, activeMessageId) {
 function toggleThreadMsg(hdr) {
   const bodyDiv = hdr.nextElementSibling;
   const toggleIcon = hdr.querySelector('.thread-msg-toggle');
+  const preview = hdr.querySelector('.thread-msg-preview');
   const isOpen = bodyDiv.classList.contains('open');
   bodyDiv.classList.toggle('open', !isOpen);
   toggleIcon.classList.toggle('open', !isOpen);
-  // Lazy render on first open
-  if (!isOpen && !bodyDiv.dataset.rendered) {
-    const msgEl = hdr.closest('.thread-msg');
-    // Body content already rendered at creation for active, lazy for others
-    if (!bodyDiv.querySelector('iframe') && !bodyDiv.querySelector('.thread-msg-text')) {
-      bodyDiv.dataset.rendered = '1';
-      // Body will be set by the lazy handler in renderThread
-    }
-  }
+  if (preview) preview.classList.toggle('hidden', !isOpen);
 }
 
 const EMAIL_IFRAME_CSS = `*{box-sizing:border-box}body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;line-height:1.65;color:#1a1a2e;background:#fff;padding:14px 16px;margin:0}a{color:#2563eb}img{max-width:100%;height:auto}blockquote{border-left:3px solid #d1d5db;margin:8px 0;padding-left:12px;color:#6b7280}pre{white-space:pre-wrap;background:#f3f4f6;padding:8px;border-radius:4px}`;
@@ -2199,7 +2251,9 @@ async function executeTool(name, input) {
         extract(m.payload);
         if (!textBody && !htmlBody && m.payload?.body?.data) textBody = b64urlDecode(m.payload.body.data);
         return { messageId:m.id, from:h('From'), to:h('To'), date:h('Date'), subject:h('Subject'),
-          body: { text: (textBody||'').substring(0,3000), html: htmlBody||null }, labels:m.labelIds };
+          snippet: m.snippet||'',
+          body: { text: (textBody||'').substring(0,3000), html: htmlBody||null },
+          labels:m.labelIds, hasAttachment: detectAttachment(m.payload) };
       });
       return { threadId:t.id, messageCount:messages.length, messages };
     }
@@ -3385,10 +3439,10 @@ document.addEventListener('click', e => {
     if (!dragging) return;
     const dx = e.clientX - startX;
     const sidebar = document.querySelector('.sidebar')?.offsetWidth || 200;
-    const rightPanel = document.querySelector('.right-panel')?.offsetWidth || 440;
-    const handle = document.getElementById('panel-resize-handle')?.offsetWidth || 8;
+    const handleW = document.getElementById('panel-resize-handle')?.offsetWidth || 8;
+    const minRightPanel = 340; // right panel min-width
     const minW = 260;
-    const maxW = window.innerWidth - sidebar - rightPanel - handle - 4;
+    const maxW = window.innerWidth - sidebar - minRightPanel - handleW - 4;
     const w = Math.max(minW, Math.min(startW + dx, maxW));
     const cp = document.querySelector('.center-panel');
     cp.style.flex = 'none';
@@ -3401,7 +3455,33 @@ document.addEventListener('click', e => {
     handle.classList.remove('dragging');
     document.body.style.cursor = '';
     document.body.style.userSelect = '';
+    recalcIframeHeights();
   });
+})();
+
+// Recalculate iframe heights in the right panel when layout changes
+function recalcIframeHeights() {
+  const iframes = document.querySelectorAll('.thread-msg-iframe, #reader-iframe');
+  iframes.forEach(iframe => {
+    try {
+      const h = iframe.contentDocument?.body?.scrollHeight;
+      if (h && h > 0) iframe.style.height = Math.min(h + 20, 800) + 'px';
+    } catch {}
+  });
+}
+
+// Observe right panel width changes and recalc iframes
+(function() {
+  const rp = document.querySelector('.right-panel');
+  if (!rp || typeof ResizeObserver === 'undefined') return;
+  let lastW = rp.offsetWidth;
+  const ro = new ResizeObserver(entries => {
+    for (const e of entries) {
+      const w = e.contentRect.width;
+      if (Math.abs(w - lastW) > 4) { lastW = w; recalcIframeHeights(); }
+    }
+  });
+  ro.observe(rp);
 })();
 </script>
 </body>
