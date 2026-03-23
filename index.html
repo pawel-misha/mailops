@@ -981,10 +981,14 @@ function setCurrentLabel(labelId) {
 }
 
 // ── DIRECT GMAIL: FETCH EMAIL LIST ──
-function detectAttachment(part) {
-  if (!part) return false;
-  if (part.filename && part.filename.length > 0) return true;
-  if (part.parts) { for (const p of part.parts) { if (detectAttachment(p)) return true; } }
+function detectAttachment(payload) {
+  if (!payload) return false;
+  // payload.mimeType IS returned with format=metadata; multipart/mixed = has attachments
+  const mt = payload.mimeType || '';
+  if (mt === 'multipart/mixed') return true;
+  // Fallback: recurse into parts (available when format=full)
+  if (payload.filename && payload.filename.length > 0) return true;
+  if (payload.parts) { for (const p of payload.parts) { if (detectAttachment(p)) return true; } }
   return false;
 }
 
@@ -992,13 +996,15 @@ async function fetchEmailMeta(messageId) {
   try {
     const m = await gFetch(
       `https://gmail.googleapis.com/gmail/v1/users/me/messages/${messageId}` +
-      `?format=metadata&metadataHeaders=Subject&metadataHeaders=From&metadataHeaders=Date`
+      `?format=metadata&metadataHeaders=Subject&metadataHeaders=From&metadataHeaders=Date&metadataHeaders=Content-Type`
     );
     const h = n => m.payload?.headers?.find(x => x.name===n)?.value || '';
+    // Content-Type header gives MIME structure even when payload.mimeType is absent
+    const ct = h('Content-Type');
+    const hasAttachment = detectAttachment(m.payload) || ct.startsWith('multipart/mixed');
     return { messageId:m.id, threadId:m.threadId, subject:h('Subject'), from:h('From'),
       sender:h('From'), date:h('Date'), snippet:m.snippet||'', labels:m.labelIds||[],
-      isUnread:(m.labelIds||[]).includes('UNREAD'),
-      hasAttachment: detectAttachment(m.payload) };
+      isUnread:(m.labelIds||[]).includes('UNREAD'), hasAttachment };
   } catch { return null; }
 }
 
