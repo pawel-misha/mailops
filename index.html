@@ -263,6 +263,30 @@ body::before {
 .reader-action-btn { flex: 1; padding: 7px; border-radius: 8px; background: var(--surface2); border: 1px solid var(--border2); color: var(--text2); font-size: 11px; font-family: 'IBM Plex Mono', monospace; cursor: pointer; transition: all 0.15s; }
 .reader-action-btn:hover { border-color: var(--amber); color: var(--amber); }
 .reader-action-btn.danger:hover { border-color: var(--danger); color: var(--danger); }
+
+/* Inline reply/forward composer */
+.reply-composer { border-top: 1px solid var(--border); background: var(--surface); flex-shrink: 0; padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; }
+.reply-composer-row { display: flex; align-items: center; gap: 8px; }
+.reply-composer-lbl { font-size: 10px; font-family: 'IBM Plex Mono', monospace; color: var(--muted); width: 34px; flex-shrink: 0; }
+.reply-composer-field { flex: 1; background: var(--surface2); border: 1px solid var(--border2); border-radius: 6px; padding: 5px 9px; font-size: 12px; color: var(--text); font-family: 'Plus Jakarta Sans', sans-serif; }
+.reply-composer-field:focus { border-color: var(--amber); outline: none; }
+.reply-composer-body { width: 100%; background: var(--surface2); border: 1px solid var(--border2); border-radius: 6px; padding: 8px 10px; font-size: 12px; color: var(--text); font-family: 'Plus Jakarta Sans', sans-serif; resize: vertical; min-height: 90px; line-height: 1.5; }
+.reply-composer-body:focus { border-color: var(--amber); outline: none; }
+.reply-composer-mode { font-size: 10px; font-family: 'IBM Plex Mono', monospace; color: var(--amber); font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; }
+.reply-composer-btns { display: flex; gap: 6px; }
+.reply-send-btn { flex: 1; padding: 7px; border-radius: 8px; background: var(--amber); border: none; color: #000; font-size: 11px; font-family: 'IBM Plex Mono', monospace; font-weight: 700; cursor: pointer; transition: all 0.15s; }
+.reply-send-btn:hover { background: var(--amber-soft); }
+.reply-send-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.reply-ai-btn { padding: 7px 10px; border-radius: 8px; background: var(--surface3); border: 1px solid var(--border2); color: var(--text2); font-size: 11px; font-family: 'IBM Plex Mono', monospace; cursor: pointer; transition: all 0.15s; white-space: nowrap; }
+.reply-ai-btn:hover { border-color: var(--amber); color: var(--amber); }
+.reply-cancel-btn { padding: 7px 10px; border-radius: 8px; background: none; border: 1px solid var(--border2); color: var(--muted); font-size: 11px; font-family: 'IBM Plex Mono', monospace; cursor: pointer; transition: all 0.15s; }
+.reply-cancel-btn:hover { border-color: var(--danger); color: var(--danger); }
+
+/* Attachment chips in thread messages */
+.msg-attachments { padding: 8px 12px 10px; display: flex; flex-wrap: wrap; gap: 6px; background: var(--surface2); }
+.attachment-chip { display: inline-flex; align-items: center; gap: 5px; padding: 4px 9px; border-radius: 6px; background: var(--surface3); border: 1px solid var(--border2); color: var(--text2); cursor: pointer; transition: all 0.15s; font-size: 11px; font-family: 'IBM Plex Mono', monospace; }
+.attachment-chip:hover { border-color: var(--amber); color: var(--amber); }
+.attachment-chip-size { font-size: 9px; color: var(--muted); margin-left: 2px; }
 .reader-loading { flex: 1; display: flex; align-items: center; justify-content: center; color: var(--muted); font-size: 12px; font-family: 'IBM Plex Mono', monospace; }
 
 /* Thread view */
@@ -335,6 +359,11 @@ body::before {
 .quarantine-btn.danger:hover { border-color: var(--danger); color: var(--danger); }
 
 /* Chat input — lives inside the right panel */
+.chat-resize-handle { height: 6px; cursor: row-resize; flex-shrink: 0; display: flex; align-items: center; justify-content: center; background: transparent; position: relative; }
+.chat-resize-handle::after { content:''; position:absolute; height:2px; left:0; right:0; background: var(--border); border-radius:1px; transition: background 0.15s; }
+.chat-resize-handle:hover::after, .chat-resize-handle.dragging::after { background: var(--amber); }
+.chat-resize-grip { display:flex; gap:4px; z-index:1; pointer-events:none; }
+.chat-resize-grip span { width:16px; height:2px; background:var(--border2); border-radius:1px; display:block; }
 .chat-input-wrap { padding: 12px 14px; border-top: 1px solid var(--border); background: var(--surface); flex-shrink: 0; }
 .input-row { display: flex; gap: 10px; align-items: flex-end; }
 /* Panel resize handle */
@@ -748,6 +777,9 @@ body::before {
       </div>
       <div class="right-panel-section active" id="right-chat">
         <div class="messages" id="messages"></div>
+        <div id="chat-resize-handle" class="chat-resize-handle">
+          <div class="chat-resize-grip"><span></span><span></span><span></span></div>
+        </div>
         <div class="chat-input-wrap">
           <div class="input-row">
             <textarea id="chat-input" placeholder="Search, delete, reply, compose… just tell me what to do" rows="1" onkeydown="handleKey(event)" oninput="autoResize(this)"></textarea>
@@ -771,11 +803,30 @@ body::before {
           <div class="reader-loading" id="reader-loading">Loading…</div>
           <iframe class="reader-iframe" id="reader-iframe" sandbox="allow-same-origin" style="display:none"></iframe>
         </div>
-        <div class="reader-actions">
+        <div class="reader-actions" id="reader-actions">
           <button class="reader-action-btn" onclick="readerAction('reply')">↩ Reply</button>
           <button class="reader-action-btn" onclick="readerAction('forward')">↪ Forward</button>
           <button class="reader-action-btn" onclick="readerAction('archive')">📦 Archive</button>
           <button class="reader-action-btn danger" onclick="readerAction('trash')">🗑 Trash</button>
+        </div>
+        <div class="reply-composer" id="reply-composer" style="display:none">
+          <div style="display:flex;align-items:center;justify-content:space-between">
+            <span class="reply-composer-mode" id="reply-composer-mode">Reply</span>
+            <button class="reply-cancel-btn" onclick="closeComposer()">✕ Cancel</button>
+          </div>
+          <div class="reply-composer-row">
+            <span class="reply-composer-lbl">To</span>
+            <input class="reply-composer-field" id="reply-to" type="text" placeholder="recipient@example.com">
+          </div>
+          <div class="reply-composer-row">
+            <span class="reply-composer-lbl">Subj</span>
+            <input class="reply-composer-field" id="reply-subject" type="text" placeholder="Subject">
+          </div>
+          <textarea class="reply-composer-body" id="reply-body" placeholder="Write your message…"></textarea>
+          <div class="reply-composer-btns">
+            <button class="reply-ai-btn" id="reply-ai-btn" onclick="aiDraftReply()">✨ AI Draft</button>
+            <button class="reply-send-btn" id="reply-send-btn" onclick="sendComposerEmail()">Send ↗</button>
+          </div>
         </div>
       </div>
     </div>
@@ -1280,6 +1331,7 @@ async function openEmail(email) {
     if (email.threadId) {
       // Fetch full thread with all messages
       const thread = await executeTool('read_thread', { threadId: email.threadId });
+      lastOpenedThread = thread; // cache for AI drafting
       loadingEl.style.display = 'none';
 
       // Update meta
@@ -1343,15 +1395,21 @@ function renderThread(thread, activeMessageId) {
       <div class="thread-msg-body ${isActive ? 'open' : ''}"></div>`;
 
     const bodyDiv = msgEl.querySelector('.thread-msg-body');
-    if (isActive) renderMessageIframe(bodyDiv, msg.body, false);
+    if (isActive) {
+      renderMessageIframe(bodyDiv, msg.body, false);
+      renderAttachments(bodyDiv, msg);
+    }
 
     // Lazy-render body on first expand; toggle snippet visibility
     msgEl.querySelector('.thread-msg-hdr').addEventListener('click', () => {
       const preview = msgEl.querySelector('.thread-msg-preview');
       if (bodyDiv.classList.contains('open')) {
-        // Now open — hide preview
+        // Now open — hide preview, lazy-render if needed
         if (preview) preview.classList.add('hidden');
-        if (!bodyDiv.dataset.rendered) renderMessageIframe(bodyDiv, msg.body, false);
+        if (!bodyDiv.dataset.rendered) {
+          renderMessageIframe(bodyDiv, msg.body, false);
+          renderAttachments(bodyDiv, msg);
+        }
       } else {
         // Now closed — show preview
         if (preview) preview.classList.remove('hidden');
@@ -1403,6 +1461,20 @@ function renderMessageIframe(container, body, fullHeight) {
   container.dataset.rendered = '1';
 }
 
+function renderAttachments(container, msg) {
+  if (!msg.attachments?.length) return;
+  const attDiv = document.createElement('div');
+  attDiv.className = 'msg-attachments';
+  msg.attachments.forEach(att => {
+    const chip = document.createElement('button');
+    chip.className = 'attachment-chip';
+    chip.innerHTML = `📎 <span>${escHtml(att.filename)}</span><span class="attachment-chip-size">${fmtBytes(att.size)}</span>`;
+    chip.onclick = e => { e.stopPropagation(); downloadAttachment(msg.messageId, att); };
+    attDiv.appendChild(chip);
+  });
+  container.appendChild(attDiv);
+}
+
 async function synthesiseThread(messageId, content) {
   if (!content || content.length < 100) return;
   if (synthesisCache[messageId]) {
@@ -1436,6 +1508,7 @@ function showSynthesis(text) {
 }
 
 function closeReader() {
+  closeComposer();
   showRightPanel('chat');
   document.querySelectorAll('.email-row').forEach(r => r.classList.remove('selected'));
   document.querySelectorAll('.thread-container').forEach(el => el.remove());
@@ -1444,26 +1517,173 @@ function closeReader() {
   currentOpenEmail = null;
 }
 
+// ── COMPOSER STATE ──
+let composerMode = null;
+let composerOrigMsgId = null;
+let composerThreadId = null;
+let composerInReplyTo = null;
+let composerReferences = null;
+let lastOpenedThread = null; // cache thread data for AI drafting
+
+function closeComposer() {
+  document.getElementById('reply-composer').style.display = 'none';
+  document.getElementById('reader-actions').style.display = '';
+  composerMode = null; composerOrigMsgId = null; composerThreadId = null;
+  composerInReplyTo = null; composerReferences = null;
+}
+
+async function openComposer(mode, messageId, threadId) {
+  composerMode = mode;
+  composerOrigMsgId = messageId;
+  composerThreadId = threadId;
+  document.getElementById('reply-composer-mode').textContent = mode === 'reply' ? 'REPLY' : 'FORWARD';
+  document.getElementById('reply-to').value = '';
+  document.getElementById('reply-subject').value = '';
+  document.getElementById('reply-body').value = mode === 'forward' ? 'Loading…' : '';
+  document.getElementById('reader-actions').style.display = 'none';
+  document.getElementById('reply-composer').style.display = '';
+
+  try {
+    const orig = await gFetch(
+      `https://gmail.googleapis.com/gmail/v1/users/me/messages/${messageId}` +
+      `?format=metadata&metadataHeaders=Subject&metadataHeaders=From&metadataHeaders=Reply-To&metadataHeaders=Date&metadataHeaders=Message-ID&metadataHeaders=References`
+    );
+    const h = n => orig.payload?.headers?.find(x => x.name===n)?.value || '';
+    const from = h('From'); const replyTo = h('Reply-To') || from;
+    const toMatch = replyTo.match(/<(.+?)>/);
+    const origSubject = h('Subject');
+    const msgId = h('Message-ID');
+    const refs = h('References');
+
+    if (mode === 'reply') {
+      document.getElementById('reply-to').value = toMatch ? toMatch[1] : replyTo;
+      document.getElementById('reply-subject').value = origSubject.startsWith('Re:') ? origSubject : `Re: ${origSubject}`;
+      composerInReplyTo = msgId;
+      composerReferences = refs ? refs + ' ' + msgId : msgId;
+      document.getElementById('reply-body').focus();
+    } else {
+      document.getElementById('reply-subject').value = origSubject.startsWith('Fwd:') ? origSubject : `Fwd: ${origSubject}`;
+      // Fetch full body for forward quote
+      const full = await gFetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${messageId}?format=full`);
+      let txt = '';
+      const ex = p => { if (p.mimeType==='text/plain'&&p.body?.data) txt+=b64urlDecode(p.body.data); if(p.parts) p.parts.forEach(ex); };
+      ex(full.payload);
+      if (!txt && full.payload?.body?.data) txt = b64urlDecode(full.payload.body.data);
+      document.getElementById('reply-body').value =
+        `\n\n---------- Forwarded message ----------\nFrom: ${from}\nDate: ${h('Date')}\nSubject: ${origSubject}\n\n${txt.substring(0,2000)}`;
+      document.getElementById('reply-to').focus();
+    }
+  } catch(err) {
+    document.getElementById('reply-body').value = '';
+    console.error('openComposer error:', err);
+  }
+}
+
+async function sendComposerEmail() {
+  const to      = document.getElementById('reply-to').value.trim();
+  const subject = document.getElementById('reply-subject').value.trim();
+  const body    = document.getElementById('reply-body').value.trim();
+  if (!to)   { document.getElementById('reply-to').focus();   return; }
+  if (!body) { document.getElementById('reply-body').focus(); return; }
+
+  const btn = document.getElementById('reply-send-btn');
+  btn.disabled = true; btn.textContent = 'Sending…';
+
+  try {
+    const mime = buildMimeEmail(composerMode === 'reply'
+      ? { to, subject, body, inReplyTo: composerInReplyTo, references: composerReferences, threadId: composerThreadId }
+      : { to, subject, body });
+    await gFetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send',
+      { method:'POST', body: JSON.stringify(mime) });
+    // Mark row as replied
+    const row = document.querySelector(`.email-row[data-message-id="${composerOrigMsgId}"]`);
+    if (row) {
+      let meta = row.querySelector('.email-row-meta');
+      if (!meta) { meta = document.createElement('div'); meta.className = 'email-row-meta'; row.querySelector('.email-row-content').appendChild(meta); }
+      if (!meta.querySelector('.email-replied-icon')) meta.insertAdjacentHTML('afterbegin', '<span class="email-replied-icon" title="You replied">↩</span>');
+    }
+    closeComposer();
+  } catch(err) {
+    btn.textContent = '⚠ Failed — retry';
+    setTimeout(() => { btn.disabled = false; btn.textContent = 'Send ↗'; }, 3000);
+  }
+}
+
+async function aiDraftReply() {
+  const aibtn = document.getElementById('reply-ai-btn');
+  aibtn.disabled = true; aibtn.textContent = '✨ Drafting…';
+  try {
+    // Use cached thread if available, otherwise fetch
+    let bodyText = '';
+    if (lastOpenedThread?.messages?.length) {
+      const latest = lastOpenedThread.messages[lastOpenedThread.messages.length - 1];
+      bodyText = latest.body?.text || latest.body?.html || '';
+    } else if (currentOpenEmail?.threadId) {
+      const t = await gFetch(`https://gmail.googleapis.com/gmail/v1/users/me/threads/${currentOpenEmail.threadId}?format=full`);
+      const last = t.messages[t.messages.length - 1];
+      let txt = '';
+      const ex = p => { if(p.mimeType==='text/plain'&&p.body?.data) txt+=b64urlDecode(p.body.data); if(p.parts) p.parts.forEach(ex); };
+      ex(last.payload);
+      bodyText = txt || b64urlDecode(last.payload?.body?.data || '') || '';
+    }
+    const prompt = composerMode === 'reply'
+      ? `Write a concise, professional reply to this email. Return only the reply body text, no greeting formalities unless natural.\n\nOriginal email:\n${bodyText.slice(0,3000)}`
+      : `Write a short professional forwarding note for this email. Return only the note text.\n\nEmail:\n${bodyText.slice(0,2000)}`;
+    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method:'POST',
+      headers:{'Content-Type':'application/json','x-api-key':ANTHROPIC_KEY,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+      body:JSON.stringify({ model:selectedModel, max_tokens:400, messages:[{role:'user',content:prompt}] })
+    });
+    const d = await resp.json();
+    const draft = d.content?.find(c=>c.type==='text')?.text || '';
+    if (draft) document.getElementById('reply-body').value = draft;
+  } catch(err) { console.error('aiDraftReply:', err); }
+  finally { aibtn.disabled = false; aibtn.textContent = '✨ AI Draft'; }
+}
+
 async function readerAction(action) {
   if (!currentOpenEmail) return;
-  const { messageId, subject, from } = currentOpenEmail;
-  if (action === 'reply') {
-    document.getElementById('chat-input').value = `Reply to email ${messageId} — ask me what I want to say`;
-    document.getElementById('chat-input').focus();
-    showRightPanel('chat');
-  } else if (action === 'forward') {
-    document.getElementById('chat-input').value = `Forward email ${messageId} — ask me who to forward to`;
-    document.getElementById('chat-input').focus();
-    showRightPanel('chat');
+  const { messageId, threadId } = currentOpenEmail;
+  if (action === 'reply' || action === 'forward') {
+    openComposer(action, messageId, threadId);
   } else if (action === 'archive') {
-    await executeTool('archive_emails', { messageIds: [messageId] });
-    document.querySelector(`.email-row[data-message-id="${messageId}"]`)?.remove();
-    closeReader();
+    const btn = document.querySelector('.reader-action-btn');
+    try {
+      await gFetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${messageId}/modify`,
+        { method:'POST', body: JSON.stringify({ removeLabelIds:['INBOX'] }) });
+      document.querySelector(`.email-row[data-message-id="${messageId}"]`)?.remove();
+      closeReader();
+    } catch(err) { console.error('Archive failed:', err); }
   } else if (action === 'trash') {
-    await executeTool('trash_emails', { messageIds: [messageId], confirmed: true });
-    document.querySelector(`.email-row[data-message-id="${messageId}"]`)?.remove();
-    closeReader();
+    try {
+      await gFetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${messageId}/trash`,
+        { method:'POST' });
+      document.querySelector(`.email-row[data-message-id="${messageId}"]`)?.remove();
+      closeReader();
+    } catch(err) { console.error('Trash failed:', err); }
   }
+}
+
+function fmtBytes(n) {
+  if (!n) return '';
+  if (n < 1024) return n + ' B';
+  if (n < 1048576) return Math.round(n/1024) + ' KB';
+  return (n/1048576).toFixed(1) + ' MB';
+}
+
+async function downloadAttachment(messageId, att) {
+  try {
+    const d = await gFetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${messageId}/attachments/${att.attachmentId}`);
+    if (!d.data) throw new Error('No data returned');
+    const binary = atob(d.data.replace(/-/g,'+').replace(/_/g,'/'));
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    const blob = new Blob([bytes], { type: att.mimeType || 'application/octet-stream' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = att.filename; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+  } catch(err) { alert('Download failed: ' + err.message); }
 }
 
 // ── LOCALSTORAGE ──
@@ -2249,17 +2469,20 @@ async function executeTool(name, input) {
       const messages = t.messages.map(m => {
         const h = n => m.payload?.headers?.find(x=>x.name===n)?.value||'';
         let textBody = '', htmlBody = '';
-        const extract = p => {
+        const attachments = [];
+        const walk = p => {
           if (p.mimeType==='text/plain' && p.body?.data) textBody += b64urlDecode(p.body.data);
           if (p.mimeType==='text/html'  && p.body?.data) htmlBody += b64urlDecode(p.body.data);
-          if (p.parts) p.parts.forEach(extract);
+          if (p.filename && p.body?.attachmentId) attachments.push({ filename:p.filename, mimeType:p.mimeType, size:p.body.size||0, attachmentId:p.body.attachmentId });
+          if (p.parts) p.parts.forEach(walk);
         };
-        extract(m.payload);
+        walk(m.payload);
         if (!textBody && !htmlBody && m.payload?.body?.data) textBody = b64urlDecode(m.payload.body.data);
         return { messageId:m.id, from:h('From'), to:h('To'), date:h('Date'), subject:h('Subject'),
+          messageIdHeader:h('Message-ID'), references:h('References'),
           snippet: m.snippet||'',
           body: { text: (textBody||'').substring(0,3000), html: htmlBody||null },
-          labels:m.labelIds, hasAttachment: detectAttachment(m.payload) };
+          labels:m.labelIds, hasAttachment: attachments.length > 0, attachments };
       });
       return { threadId:t.id, messageCount:messages.length, messages };
     }
@@ -3482,6 +3705,38 @@ function recalcIframeHeights() {
     });
   });
 }
+
+// Chat input vertical resize
+(function() {
+  const handle = document.getElementById('chat-resize-handle');
+  if (!handle) return;
+  let dragging = false, startY = 0, startH = 0;
+  handle.addEventListener('mousedown', e => {
+    dragging = true; startY = e.clientY;
+    startH = document.getElementById('messages').offsetHeight;
+    handle.classList.add('dragging');
+    document.body.style.cursor = 'row-resize';
+    document.body.style.userSelect = 'none';
+    e.preventDefault();
+  });
+  document.addEventListener('mousemove', e => {
+    if (!dragging) return;
+    const dy = e.clientY - startY;
+    const msgs = document.getElementById('messages');
+    const minH = 60;
+    const maxH = (msgs.closest('.right-panel-section')?.offsetHeight || 600) - 180;
+    const h = Math.max(minH, Math.min(startH + dy, maxH));
+    msgs.style.flex = 'none';
+    msgs.style.height = h + 'px';
+  });
+  document.addEventListener('mouseup', () => {
+    if (!dragging) return;
+    dragging = false;
+    handle.classList.remove('dragging');
+    document.body.style.cursor = '';
+    document.body.style.userSelect = '';
+  });
+})();
 
 // Observe right panel width changes and recalc iframes
 (function() {
