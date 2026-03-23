@@ -333,21 +333,23 @@ body::before {
 .send-btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; box-shadow: none; }
 .input-hint { font-size: 10px; color: var(--muted); margin-top: 4px; font-family: 'IBM Plex Mono', monospace; }
 
-.model-selector-wrap select {
-  background: var(--surface2);
-  border: 1px solid var(--border2);
-  border-radius: 8px;
-  color: var(--text);
-  font-family: 'IBM Plex Mono', monospace;
-  font-size: 11px;
-  padding: 5px 10px;
-  outline: none;
-  cursor: pointer;
-  transition: border-color 0.2s;
-  max-width: 220px;
-}
-.model-selector-wrap select:hover { border-color: var(--amber); }
-.model-selector-wrap select:focus { border-color: var(--amber); box-shadow: 0 0 0 2px var(--amber-dim); }
+.model-selector-wrap { position: relative; }
+.model-select-trigger { display: flex; align-items: center; gap: 7px; padding: 5px 10px; background: var(--surface2); border: 1px solid var(--border2); border-radius: 8px; cursor: pointer; max-width: 240px; transition: border-color 0.15s; user-select: none; }
+.model-select-trigger:hover, .model-select-trigger.open { border-color: var(--amber); }
+.model-select-name { font-size: 11px; font-weight: 600; color: var(--text); flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-family: 'IBM Plex Mono', monospace; }
+.model-select-tag { font-size: 9px; font-family: 'IBM Plex Mono', monospace; color: var(--amber); background: var(--amber-dim); padding: 1px 5px; border-radius: 4px; white-space: nowrap; flex-shrink: 0; }
+.model-select-chevron { color: var(--muted); font-size: 9px; flex-shrink: 0; transition: transform 0.15s; }
+.model-select-trigger.open .model-select-chevron { transform: rotate(180deg); }
+.model-select-dropdown { position: absolute; top: calc(100% + 5px); left: 0; min-width: 300px; background: var(--surface); border: 1px solid var(--border2); border-radius: 10px; overflow: hidden; z-index: 500; box-shadow: 0 10px 32px rgba(0,0,0,0.5); animation: fadeUp 0.12s ease; }
+.model-option { padding: 10px 12px; cursor: pointer; transition: background 0.1s; border-bottom: 1px solid var(--border); }
+.model-option:last-child { border-bottom: none; }
+.model-option:hover { background: var(--surface2); }
+.model-option.active { background: var(--amber-dim); }
+.model-option-top { display: flex; align-items: center; gap: 7px; margin-bottom: 3px; }
+.model-option-name { font-size: 12px; font-weight: 600; color: var(--text); flex: 1; font-family: 'IBM Plex Mono', monospace; }
+.model-option-tag { font-size: 9px; font-family: 'IBM Plex Mono', monospace; color: var(--amber); white-space: nowrap; }
+.model-option-price { font-size: 9px; font-family: 'IBM Plex Mono', monospace; color: var(--muted); white-space: nowrap; }
+.model-option-desc { font-size: 10px; color: var(--text2); line-height: 1.4; }
 .loading-overlay { background: var(--bg); display: none; align-items: center; justify-content: center; flex-direction: column; gap: 14px; }
 .loading-overlay.show { display: flex; }
 
@@ -492,10 +494,13 @@ body::before {
       <div class="stat-chip"><span class="label">total</span><span class="value mono" id="stat-total">—</span></div>
     </div>
     <div class="topbar-divider"></div>
-    <div class="model-selector-wrap">
-      <select id="model-select" onchange="onModelChange(this.value)">
-        <option value="claude-sonnet-4-20250514">Loading models…</option>
-      </select>
+    <div class="model-selector-wrap" id="model-selector-wrap">
+      <div class="model-select-trigger" id="model-select-trigger" onclick="toggleModelDropdown()">
+        <span class="model-select-name" id="model-select-name">Loading…</span>
+        <span class="model-select-tag" id="model-select-tag" style="display:none"></span>
+        <span class="model-select-chevron">▾</span>
+      </div>
+      <div class="model-select-dropdown" id="model-select-dropdown" style="display:none"></div>
     </div>
     <button class="web-search-btn disabled-cap" id="web-search-btn" onclick="toggleWebSearch()" title="Enable web search for this model">
       <span class="ws-dot"></span> web search
@@ -1307,6 +1312,19 @@ function loadState() {
   } catch(e) { /* ignore corrupt state */ }
 }
 
+// Model descriptions shown in the custom dropdown
+const MODEL_HINTS = [
+  { match: /opus-4|opus-5/,     tag: 'most capable',  price: '$15 / $75',    desc: 'Best quality for complex reasoning, long documents & hard tasks' },
+  { match: /sonnet-4|sonnet-5/, tag: '★ recommended', price: '$3 / $15',     desc: 'Best speed/quality balance — great for most email tasks'        },
+  { match: /sonnet-3-7/,        tag: 'deep thinking', price: '$3 / $15',     desc: 'Extended step-by-step reasoning chains'                         },
+  { match: /sonnet-3-5/,        tag: 'reliable',      price: '$3 / $15',     desc: 'Previous-gen Sonnet — fast and well-tested'                     },
+  { match: /haiku-4/,           tag: 'fastest',       price: '~$0.8 / $4',   desc: 'Lowest cost, quickest replies — good for simple tasks'          },
+  { match: /haiku-3/,           tag: 'lightest',      price: '~$0.25 / $1',  desc: 'Smallest & cheapest model — simple classification only'         },
+];
+function getModelHint(id) {
+  return MODEL_HINTS.find(h => h.match.test(id)) || { tag: '', price: '', desc: 'Claude AI model' };
+}
+
 // Pricing per million tokens (input / output) — USD
 const MODEL_PRICING = [
   { match: /opus-4|opus-5/,   input: 15,   output: 75   },
@@ -1323,6 +1341,62 @@ function getPricing(modelId) {
   return rule || { input: 3, output: 15 }; // default to sonnet pricing
 }
 
+function populateModelDropdown(models) {
+  const dd = document.getElementById('model-select-dropdown');
+  dd.innerHTML = '';
+  // Ensure selectedModel is valid
+  if (!models.find(m => m.id === selectedModel)) selectedModel = models[0]?.id || selectedModel;
+  models.forEach(m => {
+    const hint = getModelHint(m.id);
+    const name = m.display_name || m.id;
+    const el = document.createElement('div');
+    el.className = 'model-option' + (m.id === selectedModel ? ' active' : '');
+    el.dataset.modelId = m.id;
+    el.onclick = () => chooseModel(m.id, name);
+    el.innerHTML =
+      `<div class="model-option-top">` +
+        `<span class="model-option-name">${escHtml(name)}</span>` +
+        (hint.tag   ? `<span class="model-option-tag">${escHtml(hint.tag)}</span>` : '') +
+        (hint.price ? `<span class="model-option-price">${escHtml(hint.price)}/M tok</span>` : '') +
+      `</div>` +
+      `<div class="model-option-desc">${escHtml(hint.desc)}</div>`;
+    dd.appendChild(el);
+  });
+  // Sync trigger display
+  const active = models.find(m => m.id === selectedModel) || models[0];
+  if (active) setModelTrigger(active.display_name || active.id, active.id);
+}
+
+function setModelTrigger(name, id) {
+  document.getElementById('model-select-name').textContent = name;
+  const tagEl = document.getElementById('model-select-tag');
+  const hint = getModelHint(id);
+  if (hint.tag) { tagEl.textContent = hint.tag; tagEl.style.display = ''; }
+  else tagEl.style.display = 'none';
+}
+
+function toggleModelDropdown() {
+  const dd = document.getElementById('model-select-dropdown');
+  const trigger = document.getElementById('model-select-trigger');
+  const open = dd.style.display === 'none';
+  dd.style.display = open ? 'block' : 'none';
+  trigger.classList.toggle('open', open);
+}
+
+function closeModelDropdown() {
+  document.getElementById('model-select-dropdown').style.display = 'none';
+  document.getElementById('model-select-trigger').classList.remove('open');
+}
+
+function chooseModel(id, name) {
+  document.querySelectorAll('.model-option').forEach(el =>
+    el.classList.toggle('active', el.dataset.modelId === id)
+  );
+  setModelTrigger(name, id);
+  closeModelDropdown();
+  onModelChange(id);
+}
+
 async function fetchModels() {
   try {
     const r = await fetch('https://api.anthropic.com/v1/models', {
@@ -1332,38 +1406,20 @@ async function fetchModels() {
         'anthropic-dangerous-direct-browser-access': 'true'
       }
     });
-    if (!r.ok) return;
+    if (!r.ok) throw new Error('API error');
     const data = await r.json();
-    const select = document.getElementById('model-select');
-    select.innerHTML = '';
-    // Filter to only claude models, sort newest first
     const models = (data.data || [])
       .filter(m => m.id.startsWith('claude-'))
       .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-    models.forEach(m => {
-      const opt = document.createElement('option');
-      opt.value = m.id;
-      opt.textContent = m.display_name || m.id;
-      if (m.id === selectedModel) opt.selected = true;
-      select.appendChild(opt);
-    });
-    // If none selected, pick first
-    if (!select.value && models.length) {
-      selectedModel = models[0].id;
-      select.value = selectedModel;
-    }
-  } catch(e) {
-    // Fallback: populate with known models
-    const select = document.getElementById('model-select');
-    const fallback = [
-      { id: 'claude-opus-4-6', name: 'Claude Opus 4.6' },
-      { id: 'claude-sonnet-4-6', name: 'Claude Sonnet 4.6' },
-      { id: 'claude-sonnet-4-20250514', name: 'Claude Sonnet 4 (2025-05-14)' },
-      { id: 'claude-haiku-4-5-20251001', name: 'Claude Haiku 4.5' },
-    ];
-    select.innerHTML = fallback.map(m =>
-      `<option value="${m.id}"${m.id===selectedModel?' selected':''}>${m.name}</option>`
-    ).join('');
+    if (models.length) populateModelDropdown(models);
+  } catch {
+    // Fallback with known models
+    populateModelDropdown([
+      { id: 'claude-opus-4-5-20251101',   display_name: 'Claude Opus 4.5'   },
+      { id: 'claude-sonnet-4-5-20251101', display_name: 'Claude Sonnet 4.5' },
+      { id: 'claude-sonnet-4-20250514',   display_name: 'Claude Sonnet 4'   },
+      { id: 'claude-haiku-4-5-20251001',  display_name: 'Claude Haiku 4.5'  },
+    ]);
   }
 }
 
@@ -3157,6 +3213,10 @@ async function quarantineAction(action, idx) {
 // ── INIT ──
 loadState();
 autoLogin();
+// Close model dropdown when clicking outside
+document.addEventListener('click', e => {
+  if (!e.target.closest('#model-selector-wrap')) closeModelDropdown();
+});
 </script>
 </body>
 </html>
