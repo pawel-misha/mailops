@@ -144,9 +144,11 @@ body::before {
 .email-list-header { padding: 10px 14px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 8px; flex-shrink: 0; background: var(--surface); }
 .email-list-title { font-size: 11px; font-family: 'IBM Plex Mono', monospace; color: var(--text2); flex: 1; }
 .email-list-count { font-size: 10px; font-family: 'IBM Plex Mono', monospace; color: var(--muted); }
-.email-list { flex: 1; overflow-y: auto; }
-.email-list::-webkit-scrollbar { width: 3px; }
-.email-list::-webkit-scrollbar-thumb { background: var(--border2); }
+.email-list { flex: 1; overflow-y: auto; scrollbar-gutter: stable; }
+.email-list::-webkit-scrollbar { width: 4px; }
+.email-list::-webkit-scrollbar-track { background: transparent; }
+.email-list::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+.email-list::-webkit-scrollbar-thumb:hover { background: var(--muted); }
 .email-row { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-bottom: 1px solid var(--border); cursor: pointer; transition: background 0.12s; position: relative; }
 .email-row:hover { background: var(--surface2); }
 .email-row:hover .email-row-actions { opacity: 1; }
@@ -171,7 +173,7 @@ body::before {
 .email-list-more-btn:hover { border-color: var(--amber); color: var(--amber); }
 
 /* ── RIGHT PANEL ── */
-.right-panel { width: 440px; min-width: 340px; display: flex; flex-direction: column; overflow: hidden; flex-shrink: 0; }
+.right-panel { flex: 0 0 440px; min-width: 340px; display: flex; flex-direction: column; overflow: hidden; }
 .right-panel-tabs { display: flex; border-bottom: 1px solid var(--border); background: var(--surface); flex-shrink: 0; }
 .rp-tab { flex: 1; padding: 10px; font-size: 11px; font-family: 'IBM Plex Mono', monospace; color: var(--muted); background: none; border: none; border-bottom: 2px solid transparent; cursor: pointer; transition: all 0.15s; letter-spacing: 0.05em; }
 .rp-tab:hover { color: var(--text); }
@@ -327,9 +329,12 @@ body::before {
 .chat-input-wrap { padding: 12px 14px; border-top: 1px solid var(--border); background: var(--surface); flex-shrink: 0; }
 .input-row { display: flex; gap: 10px; align-items: flex-end; }
 /* Panel resize handle */
-.panel-resize-handle { width: 4px; flex-shrink: 0; cursor: col-resize; background: var(--border); transition: background 0.15s; position: relative; z-index: 10; }
-.panel-resize-handle::before { content:''; position:absolute; inset:0 -6px; } /* widen hit area */
-.panel-resize-handle:hover, .panel-resize-handle.dragging { background: var(--amber); }
+.panel-resize-handle { width: 8px; flex-shrink: 0; cursor: col-resize; background: transparent; position: relative; z-index: 10; display: flex; align-items: center; justify-content: center; }
+.panel-resize-handle::after { content:''; position:absolute; width:2px; inset:0; background:var(--border); transition:background 0.15s; border-radius:1px; }
+.panel-resize-grip { display: flex; flex-direction: column; gap: 3px; z-index: 1; pointer-events: none; }
+.panel-resize-grip span { width: 2px; height: 2px; border-radius: 50%; background: var(--border2); display: block; }
+.panel-resize-handle:hover::after, .panel-resize-handle.dragging::after { background: var(--amber); }
+.panel-resize-handle:hover .panel-resize-grip span, .panel-resize-handle.dragging .panel-resize-grip span { background: var(--amber); }
 /* Label tree */
 .label-group { }
 .label-group-hdr { display: flex; align-items: center; gap: 5px; padding: 5px 8px 5px 10px; border-radius: 8px; cursor: pointer; font-size: 12px; color: var(--text2); transition: all 0.12s; user-select: none; }
@@ -722,7 +727,9 @@ body::before {
     </div>
 
     <!-- RESIZE HANDLE -->
-    <div class="panel-resize-handle" id="panel-resize-handle"></div>
+    <div class="panel-resize-handle" id="panel-resize-handle">
+      <div class="panel-resize-grip"><span></span><span></span><span></span><span></span><span></span></div>
+    </div>
 
     <!-- RIGHT PANEL -->
     <div class="right-panel">
@@ -807,6 +814,7 @@ const GMAIL_SCOPE = 'https://www.googleapis.com/auth/gmail.modify https://www.go
 
 // ── EMAIL LIST STATE ──
 let currentEmailList = [];
+let currentEmailListLabelId = null; // which label is currently rendered
 let currentSearchQuery = '';
 let currentSearchNextToken = null;
 let currentLabelId = 'INBOX';
@@ -950,8 +958,14 @@ function getLabelName(labelId) {
 }
 
 function setCurrentLabel(labelId) {
+  if (labelId === currentLabelId && labelId === currentEmailListLabelId) {
+    // Already on this label — just make sure panel is visible
+    showCenterPanel('email-list');
+    return;
+  }
   currentLabelId = labelId;
-  document.querySelectorAll('#labels-nav .qa').forEach(el =>
+  currentEmailListLabelId = null; // force full replace on next fetch
+  document.querySelectorAll('#labels-nav .qa, #labels-nav .label-group-hdr').forEach(el =>
     el.classList.toggle('active', el.dataset.labelId === labelId)
   );
   fetchEmails(labelId);
@@ -973,9 +987,12 @@ async function fetchEmailMeta(messageId) {
 
 async function fetchEmails(labelId = currentLabelId, pageToken = null) {
   const isAppend = pageToken != null;
+  // Same label + has content + not appending = smart diff (preserve scroll)
+  const isDiff = !isAppend && labelId === currentEmailListLabelId && currentEmailList.length > 0;
   currentLabelId = labelId;
 
-  if (!isAppend) {
+  if (!isAppend && !isDiff) {
+    // Full replace: switching label or first load — show loading state
     showCenterPanel('email-list');
     document.getElementById('email-list-title').textContent = getLabelName(labelId) || labelId;
     document.getElementById('email-list-count').textContent = 'loading…';
@@ -987,7 +1004,7 @@ async function fetchEmails(labelId = currentLabelId, pageToken = null) {
   }
 
   const btn = document.getElementById('refresh-btn');
-  if (btn && !isAppend) btn.classList.add('spinning');
+  if (btn) btn.classList.add('spinning');
 
   try {
     let url = `https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=50&labelIds=${encodeURIComponent(labelId)}`;
@@ -995,7 +1012,7 @@ async function fetchEmails(labelId = currentLabelId, pageToken = null) {
     const data = await gFetch(url);
 
     if (!data.messages?.length) {
-      if (!isAppend) {
+      if (!isAppend && !isDiff) {
         document.getElementById('email-list').innerHTML =
           '<div style="padding:24px;text-align:center;color:var(--muted);font-size:12px">No emails</div>';
         document.getElementById('email-list-count').textContent = '0 emails';
@@ -1020,7 +1037,11 @@ async function fetchEmails(labelId = currentLabelId, pageToken = null) {
     if (isAppend) {
       currentEmailList = [...currentEmailList, ...metas];
       metas.forEach(e => listEl.appendChild(buildEmailRow(e)));
+    } else if (isDiff) {
+      diffEmailList(metas, listEl);
     } else {
+      // Full replace
+      currentEmailListLabelId = labelId;
       currentEmailList = metas;
       listEl.innerHTML = '';
       metas.forEach(e => listEl.appendChild(buildEmailRow(e)));
@@ -1033,14 +1054,62 @@ async function fetchEmails(labelId = currentLabelId, pageToken = null) {
     lastRefreshedAt = new Date();
     updateRefreshStatus();
   } catch(err) {
-    if (!isAppend) {
+    if (!isAppend && !isDiff) {
       document.getElementById('email-list').innerHTML =
         `<div style="padding:24px;text-align:center;color:var(--danger);font-size:12px">⚠ ${escHtml(err.message)}</div>`;
       document.getElementById('email-list-count').textContent = 'error';
     }
   } finally {
-    if (btn && !isAppend) btn.classList.remove('spinning');
+    if (btn) btn.classList.remove('spinning');
   }
+}
+
+function diffEmailList(newMetas, listEl) {
+  // Save scroll position (email-list's parent, which is center-section)
+  const scrollEl = listEl.parentElement;
+  const savedScroll = scrollEl?.scrollTop || 0;
+
+  const oldMap = new Map(currentEmailList.map(e => [e.messageId, e]));
+  const newMap = new Map(newMetas.map(e => [e.messageId, e]));
+
+  // 1. Remove rows that no longer exist
+  for (const email of currentEmailList) {
+    if (!newMap.has(email.messageId)) {
+      const row = listEl.querySelector(`[data-message-id="${email.messageId}"]`);
+      if (row) row.remove();
+    }
+  }
+
+  // 2. Prepend truly new messages at the top (not in old list)
+  const toAdd = newMetas.filter(e => !oldMap.has(e.messageId));
+  const anchor = listEl.firstElementChild;
+  for (let i = toAdd.length - 1; i >= 0; i--) {
+    const row = buildEmailRow(toAdd[i]);
+    if (anchor) listEl.insertBefore(row, anchor);
+    else listEl.appendChild(row);
+  }
+
+  // 3. Update read/unread dot on rows whose status changed
+  for (const email of newMetas) {
+    const old = oldMap.get(email.messageId);
+    if (old && old.isUnread !== email.isUnread) {
+      const row = listEl.querySelector(`[data-message-id="${email.messageId}"]`);
+      if (row) {
+        row.classList.toggle('unread', email.isUnread);
+        const dot = row.querySelector('.unread-dot');
+        if (dot) dot.style.visibility = email.isUnread ? 'visible' : 'hidden';
+      }
+    }
+  }
+
+  currentEmailList = newMetas;
+
+  // Update count quietly (no flash)
+  const countEl = document.getElementById('email-list-count');
+  if (countEl) countEl.textContent = `${newMetas.length} emails${toAdd.length ? ` · +${toAdd.length} new` : ''}`;
+
+  // Restore scroll — only if user hadn't scrolled to top
+  if (savedScroll > 0 && scrollEl) scrollEl.scrollTop = savedScroll;
 }
 
 async function refreshCurrentLabel() {
@@ -3316,8 +3385,10 @@ document.addEventListener('click', e => {
     if (!dragging) return;
     const dx = e.clientX - startX;
     const sidebar = document.querySelector('.sidebar')?.offsetWidth || 200;
+    const rightPanel = document.querySelector('.right-panel')?.offsetWidth || 440;
+    const handle = document.getElementById('panel-resize-handle')?.offsetWidth || 8;
     const minW = 260;
-    const maxW = window.innerWidth - sidebar - 360; // leave room for right panel
+    const maxW = window.innerWidth - sidebar - rightPanel - handle - 4;
     const w = Math.max(minW, Math.min(startW + dx, maxW));
     const cp = document.querySelector('.center-panel');
     cp.style.flex = 'none';
