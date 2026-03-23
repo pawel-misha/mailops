@@ -364,8 +364,8 @@ body::before {
 .chat-resize-handle:hover::after, .chat-resize-handle.dragging::after { background: var(--amber); }
 .chat-resize-grip { display:flex; gap:4px; z-index:1; pointer-events:none; }
 .chat-resize-grip span { width:16px; height:2px; background:var(--border2); border-radius:1px; display:block; }
-.chat-input-wrap { padding: 12px 14px; border-top: 1px solid var(--border); background: var(--surface); flex-shrink: 0; }
-.input-row { display: flex; gap: 10px; align-items: flex-end; }
+.chat-input-wrap { padding: 12px 14px; border-top: 1px solid var(--border); background: var(--surface); flex-shrink: 0; display: flex; flex-direction: column; gap: 8px; }
+.input-row { display: flex; gap: 10px; align-items: flex-end; flex: 1; min-height: 0; }
 /* Panel resize handle */
 .panel-resize-handle { width: 8px; flex-shrink: 0; cursor: col-resize; background: transparent; position: relative; z-index: 10; display: flex; align-items: center; justify-content: center; }
 .panel-resize-handle::after { content:''; position:absolute; width:2px; inset:0; background:var(--border); transition:background 0.15s; border-radius:1px; }
@@ -382,7 +382,7 @@ body::before {
 .label-arrow.open { transform: rotate(90deg); }
 .label-group-name { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .label-group-children { }
-#chat-input { flex: 1; padding: 10px 14px; background: var(--surface2); border: 1px solid var(--border2); border-radius: 12px; color: var(--text); font-family: 'Plus Jakarta Sans', sans-serif; font-size: 13px; outline: none; resize: none; transition: border-color 0.2s, box-shadow 0.2s; min-height: 42px; max-height: 130px; line-height: 1.5; }
+#chat-input { flex: 1; padding: 10px 14px; background: var(--surface2); border: 1px solid var(--border2); border-radius: 12px; color: var(--text); font-family: 'Plus Jakarta Sans', sans-serif; font-size: 13px; outline: none; resize: none; transition: border-color 0.2s, box-shadow 0.2s; min-height: 42px; max-height: 130px; height: 42px; line-height: 1.5; align-self: stretch; }
 #chat-input:focus { border-color: var(--amber); box-shadow: 0 0 0 3px var(--amber-dim); }
 #chat-input::placeholder { color: var(--muted); }
 .send-btn { width: 42px; height: 42px; border-radius: 12px; background: var(--amber); border: none; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s; font-size: 15px; flex-shrink: 0; }
@@ -3706,14 +3706,14 @@ function recalcIframeHeights() {
   });
 }
 
-// Chat input vertical resize
+// Chat input vertical resize — dragging UP grows the textarea, shrinks message history
 (function() {
   const handle = document.getElementById('chat-resize-handle');
   if (!handle) return;
-  let dragging = false, startY = 0, startH = 0;
+  let dragging = false, startY = 0, startWrapH = 0;
   handle.addEventListener('mousedown', e => {
     dragging = true; startY = e.clientY;
-    startH = document.getElementById('messages').offsetHeight;
+    startWrapH = document.querySelector('.chat-input-wrap').offsetHeight;
     handle.classList.add('dragging');
     document.body.style.cursor = 'row-resize';
     document.body.style.userSelect = 'none';
@@ -3721,13 +3721,23 @@ function recalcIframeHeights() {
   });
   document.addEventListener('mousemove', e => {
     if (!dragging) return;
-    const dy = e.clientY - startY;
+    const dy = e.clientY - startY; // negative = dragged up = bigger input
+    const wrap = document.querySelector('.chat-input-wrap');
     const msgs = document.getElementById('messages');
-    const minH = 60;
-    const maxH = (msgs.closest('.right-panel-section')?.offsetHeight || 600) - 180;
-    const h = Math.max(minH, Math.min(startH + dy, maxH));
-    msgs.style.flex = 'none';
-    msgs.style.height = h + 'px';
+    const input = document.getElementById('chat-input');
+    const panelH = wrap.closest('.right-panel-section')?.offsetHeight || 600;
+    const minWrapH = 68;  // just the input at default height
+    const maxWrapH = panelH - 80; // leave room for at least a few messages
+    const newWrapH = Math.max(minWrapH, Math.min(startWrapH - dy, maxWrapH));
+    // Input fills the wrap (subtract padding top+bottom 24px + hint ~20px)
+    const inputH = Math.max(42, newWrapH - 44);
+    wrap.style.flex = 'none';
+    wrap.style.height = newWrapH + 'px';
+    input.style.height = inputH + 'px';
+    input.style.maxHeight = inputH + 'px';
+    // Messages fills remaining space
+    msgs.style.flex = '1';
+    msgs.style.height = '';
   });
   document.addEventListener('mouseup', () => {
     if (!dragging) return;
